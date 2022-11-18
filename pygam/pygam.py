@@ -76,7 +76,7 @@ from pygam.terms import TermList
 from pygam.terms import MetaTermMixin
 
 
-EPS = np.finfo(np.float64).eps # machine epsilon
+EPS = np.finfo(np.float64).eps  # machine epsilon
 
 
 class GAM(Core, MetaTermMixin):
@@ -147,10 +147,19 @@ class GAM(Core, MetaTermMixin):
     International Biometric Society: A Crash Course on P-splines
     http://www.ibschannel2015.nl/project/userfiles/Crash_course_handout.pdf
     """
-    def __init__(self, terms='auto', max_iter=100, tol=1e-4,
-                 distribution='normal', link='identity',
-                 callbacks=['deviance', 'diffs'],
-                 fit_intercept=True, verbose=False, **kwargs):
+
+    def __init__(
+        self,
+        terms="auto",
+        max_iter=100,
+        tol=1e-4,
+        distribution="normal",
+        link="identity",
+        callbacks=["deviance", "diffs"],
+        fit_intercept=True,
+        verbose=False,
+        **kwargs
+    ):
 
         self.max_iter = max_iter
         self.tol = tol
@@ -163,15 +172,17 @@ class GAM(Core, MetaTermMixin):
 
         for k, v in kwargs.items():
             if k not in self._plural:
-                raise TypeError('__init__() got an unexpected keyword argument {}'.format(k))
+                raise TypeError(
+                    "__init__() got an unexpected keyword argument {}".format(k)
+                )
             setattr(self, k, v)
 
         # internal settings
-        self._constraint_lam = 1e9 # regularization intensity for constraints
-        self._constraint_l2 = 1e-3 # diagononal loading to improve conditioning
-        self._constraint_l2_max = 1e-1 # maximum loading
+        self._constraint_lam = 1e9  # regularization intensity for constraints
+        self._constraint_l2 = 1e-3  # diagononal loading to improve conditioning
+        self._constraint_l2_max = 1e-1  # maximum loading
         # self._opt = 0 # use 0 for numerically stable optimizer, 1 for naive
-        self._term_location = 'terms' # for locating sub terms
+        self._term_location = "terms"  # for locating sub terms
         # self._include = ['lam']
 
         # call super and exclude any variables
@@ -203,7 +214,7 @@ class GAM(Core, MetaTermMixin):
         -------
         bool : whether or not the model is fitted
         """
-        return hasattr(self, 'coef_')
+        return hasattr(self, "coef_")
 
     def _validate_params(self):
         """method to sanitize model parameters
@@ -218,40 +229,52 @@ class GAM(Core, MetaTermMixin):
         """
         # fit_intercep
         if not isinstance(self.fit_intercept, bool):
-            raise ValueError('fit_intercept must be type bool, but found {}'\
-                             .format(self.fit_intercept.__class__))
+            raise ValueError(
+                "fit_intercept must be type bool, but found {}".format(
+                    self.fit_intercept.__class__
+                )
+            )
 
         # terms
-        if (self.terms != 'auto') and not (isinstance(self.terms, (TermList, Term, type(None)))):
-            raise ValueError('terms must be a TermList, but found '\
-                             'terms = {}'.format(self.terms))
+        if (self.terms != "auto") and not (
+            isinstance(self.terms, (TermList, Term, type(None)))
+        ):
+            raise ValueError(
+                "terms must be a TermList, but found " "terms = {}".format(self.terms)
+            )
 
         # max_iter
-        self.max_iter = check_param(self.max_iter, param_name='max_iter',
-                                    dtype='int', constraint='>=1',
-                                    iterable=False)
+        self.max_iter = check_param(
+            self.max_iter,
+            param_name="max_iter",
+            dtype="int",
+            constraint=">=1",
+            iterable=False,
+        )
 
         # distribution
-        if not ((self.distribution in DISTRIBUTIONS)
-                or isinstance(self.distribution, Distribution)):
-            raise ValueError('unsupported distribution {}'.format(self.distribution))
+        if not (
+            (self.distribution in DISTRIBUTIONS)
+            or isinstance(self.distribution, Distribution)
+        ):
+            raise ValueError("unsupported distribution {}".format(self.distribution))
         if self.distribution in DISTRIBUTIONS:
             self.distribution = DISTRIBUTIONS[self.distribution]()
 
         # link
         if not ((self.link in LINKS) or isinstance(self.link, Link)):
-            raise ValueError('unsupported link {}'.format(self.link))
+            raise ValueError("unsupported link {}".format(self.link))
         if self.link in LINKS:
             self.link = LINKS[self.link]()
 
         # callbacks
         if not isiterable(self.callbacks):
-            raise ValueError('Callbacks must be iterable, but found {}'\
-                             .format(self.callbacks))
+            raise ValueError(
+                "Callbacks must be iterable, but found {}".format(self.callbacks)
+            )
 
-        if not all([c in CALLBACKS or
-                    isinstance(c, CallBack) for c in self.callbacks]):
-            raise ValueError('unsupported callback(s) {}'.format(self.callbacks))
+        if not all([c in CALLBACKS or isinstance(c, CallBack) for c in self.callbacks]):
+            raise ValueError("unsupported callback(s) {}".format(self.callbacks))
         callbacks = list(self.callbacks)
         for i, c in enumerate(self.callbacks):
             if c in CALLBACKS:
@@ -273,9 +296,11 @@ class GAM(Core, MetaTermMixin):
         n_samples, m_features = X.shape
 
         # terms
-        if self.terms == 'auto':
+        if self.terms == "auto":
             # one numerical spline per feature
-            self.terms = TermList(*[SplineTerm(feat, verbose=self.verbose) for feat in range(m_features)])
+            self.terms = TermList(
+                *[SplineTerm(feat, verbose=self.verbose) for feat in range(m_features)]
+            )
 
         elif self.terms is None:
             # no terms
@@ -290,7 +315,7 @@ class GAM(Core, MetaTermMixin):
             self.terms = self.terms + Intercept()
 
         if len(self.terms) == 0:
-            raise ValueError('At least 1 term must be specified')
+            raise ValueError("At least 1 term must be specified")
 
         # copy over things from plural
         remove = []
@@ -325,12 +350,13 @@ class GAM(Core, MetaTermMixin):
         mu = self.predict_mu(X)
 
         if weights is not None:
-            weights = np.array(weights).astype('f').ravel()
-            weights = check_array(weights, name='sample weights',
-                                  ndim=1, verbose=self.verbose)
+            weights = np.array(weights).astype("f").ravel()
+            weights = check_array(
+                weights, name="sample weights", ndim=1, verbose=self.verbose
+            )
             check_lengths(y, weights)
         else:
-            weights = np.ones_like(y).astype('float64')
+            weights = np.ones_like(y).astype("float64")
 
         return self._loglikelihood(y, mu, weights=weights)
 
@@ -407,11 +433,16 @@ class GAM(Core, MetaTermMixin):
             containing expected values under the model
         """
         if not self._is_fitted:
-            raise AttributeError('GAM has not been fitted. Call fit first.')
+            raise AttributeError("GAM has not been fitted. Call fit first.")
 
-        X = check_X(X, n_feats=self.statistics_['m_features'],
-                    edge_knots=self.edge_knots_, dtypes=self.dtype,
-                    features=self.feature, verbose=self.verbose)
+        X = check_X(
+            X,
+            n_feats=self.statistics_["m_features"],
+            edge_knots=self.edge_knots_,
+            dtypes=self.dtype,
+            features=self.feature,
+            verbose=self.verbose,
+        )
 
         lp = self._linear_predictor(X)
         return self.link.mu(lp, self.distribution)
@@ -452,9 +483,14 @@ class GAM(Core, MetaTermMixin):
         modelmat : sparse matrix of len n_samples
             containing model matrix of the spline basis for selected features
         """
-        X = check_X(X, n_feats=self.statistics_['m_features'],
-                    edge_knots=self.edge_knots_, dtypes=self.dtype,
-                    features=self.feature, verbose=self.verbose)
+        X = check_X(
+            X,
+            n_feats=self.statistics_["m_features"],
+            edge_knots=self.edge_knots_,
+            dtypes=self.dtype,
+            features=self.feature,
+            verbose=self.verbose,
+        )
 
         return self.terms.build_columns(X, term=term)
 
@@ -487,15 +523,16 @@ class GAM(Core, MetaTermMixin):
                 return L
             except NotPositiveDefiniteError:
                 if self.verbose:
-                    warnings.warn('Matrix is not positive definite. \n'\
-                                  'Increasing l2 reg by factor of 10.',
-                                  stacklevel=2)
+                    warnings.warn(
+                        "Matrix is not positive definite. \n"
+                        "Increasing l2 reg by factor of 10.",
+                        stacklevel=2,
+                    )
                 A -= constraint_l2 * diag
                 constraint_l2 *= 10
                 A += constraint_l2 * diag
 
-        raise NotPositiveDefiniteError('Matrix is not positive \n'
-                                       'definite.')
+        raise NotPositiveDefiniteError("Matrix is not positive \n" "definite.")
 
     def _P(self):
         """
@@ -535,9 +572,9 @@ class GAM(Core, MetaTermMixin):
         -------
         C : sparse CSC matrix containing the model constraints in quadratic form
         """
-        return self.terms.build_constraints(self.coef_,
-                                            self._constraint_lam,
-                                            self._constraint_l2)
+        return self.terms.build_constraints(
+            self.coef_, self._constraint_lam, self._constraint_l2
+        )
 
     def _pseudo_data(self, y, lp, mu):
         """
@@ -588,9 +625,14 @@ class GAM(Core, MetaTermMixin):
         -------
         weights : sp..sparse array of shape (n_samples, n_samples)
         """
-        return sp.sparse.diags((self.link.gradient(mu, self.distribution)**2 *
-                                self.distribution.V(mu=mu) *
-                                weights ** -1)**-0.5)
+        return sp.sparse.diags(
+            (
+                self.link.gradient(mu, self.distribution) ** 2
+                * self.distribution.V(mu=mu)
+                * weights**-1
+            )
+            ** -0.5
+        )
 
     def _mask(self, weights):
         """
@@ -613,10 +655,11 @@ class GAM(Core, MetaTermMixin):
         """
         mask = (np.abs(weights) >= np.sqrt(EPS)) * np.isfinite(weights)
         if mask.sum() == 0:
-            raise OptimizationError('PIRLS optimization has diverged.\n' +
-                'Try increasing regularization, or specifying an initial value for self.coef_')
+            raise OptimizationError(
+                "PIRLS optimization has diverged.\n"
+                + "Try increasing regularization, or specifying an initial value for self.coef_"
+            )
         return mask
-
 
     def _initial_estimate(self, y, modelmat):
         """
@@ -651,17 +694,20 @@ class GAM(Core, MetaTermMixin):
             return np.ones(m) * np.sqrt(EPS)
 
         # transform the problem to the linear scale
-        y = deepcopy(y).astype('float64')
-        y[y == 0] += .01 # edge case for log link, inverse link, and logit link
-        y[y == 1] -= .01 # edge case for logit link
+        y = deepcopy(y).astype("float64")
+        y[y == 0] += 0.01  # edge case for log link, inverse link, and logit link
+        y[y == 1] -= 0.01  # edge case for logit link
 
         y_ = self.link.link(y, self.distribution)
         y_ = make_2d(y_, verbose=False)
-        assert np.isfinite(y_).all(), "transformed response values should be well-behaved."
+        assert np.isfinite(
+            y_
+        ).all(), "transformed response values should be well-behaved."
 
         # solve the linear problem
-        return np.linalg.solve(load_diagonal(modelmat.T.dot(modelmat).A),
-                               modelmat.T.dot(y_))
+        return np.linalg.solve(
+            load_diagonal(modelmat.T.dot(modelmat).A), modelmat.T.dot(y_)
+        )
 
         # not sure if this is faster...
         # return np.linalg.pinv(modelmat.T.dot(modelmat)).dot(modelmat.T.dot(y_))
@@ -683,28 +729,32 @@ class GAM(Core, MetaTermMixin):
         -------
         None
         """
-        modelmat = self._modelmat(X) # build a basis matrix for the GLM
+        modelmat = self._modelmat(X)  # build a basis matrix for the GLM
         n, m = modelmat.shape
 
         # initialize GLM coefficients if model is not yet fitted
-        if (not self._is_fitted
+        if (
+            not self._is_fitted
             or len(self.coef_) != self.terms.n_coefs
-            or not np.isfinite(self.coef_).all()):
+            or not np.isfinite(self.coef_).all()
+        ):
 
-           # initialize the model
-           self.coef_ = self._initial_estimate(Y, modelmat)
+            # initialize the model
+            self.coef_ = self._initial_estimate(Y, modelmat)
 
-        assert np.isfinite(self.coef_).all(), "coefficients should be well-behaved, but found: {}".format(self.coef_)
+        assert np.isfinite(
+            self.coef_
+        ).all(), "coefficients should be well-behaved, but found: {}".format(self.coef_)
 
         P = self._P()
-        S = sp.sparse.diags(np.ones(m) * np.sqrt(EPS)) # improve condition
+        S = sp.sparse.diags(np.ones(m) * np.sqrt(EPS))  # improve condition
         # S += self._H # add any user-chosen minumum penalty to the diagonal
 
         # if we dont have any constraints, then do cholesky now
         if not self.terms.hasconstraint:
             E = self._cholesky(S + P, sparse=False, verbose=self.verbose)
 
-        min_n_m = np.min([m,n])
+        min_n_m = np.min([m, n])
         Dinv = np.zeros((min_n_m + m, m)).T
 
         for _ in range(self.max_iter):
@@ -716,17 +766,17 @@ class GAM(Core, MetaTermMixin):
                 E = self._cholesky(S + P + C, sparse=False, verbose=self.verbose)
 
             # forward pass
-            y = deepcopy(Y) # for simplicity
+            y = deepcopy(Y)  # for simplicity
             lp = self._linear_predictor(modelmat=modelmat)
             mu = self.link.mu(lp, self.distribution)
-            W = self._W(mu, weights, y) # create pirls weight matrix
+            W = self._W(mu, weights, y)  # create pirls weight matrix
 
             # check for weghts == 0, nan, and update
             mask = self._mask(W.diagonal())
-            y = y[mask] # update
-            lp = lp[mask] # update
-            mu = mu[mask] # update
-            W = sp.sparse.diags(W.diagonal()[mask]) # update
+            y = y[mask]  # update
+            lp = lp[mask]  # update
+            mu = mu[mask]  # update
+            W = sp.sparse.diags(W.diagonal()[mask])  # update
 
             # PIRLS Wood pg 183
             pseudo_data = W.dot(self._pseudo_data(y, lp, mu))
@@ -734,12 +784,13 @@ class GAM(Core, MetaTermMixin):
             # log on-loop-start stats
             self._on_loop_start(vars())
 
-            WB = W.dot(modelmat[mask,:]) # common matrix product
+            WB = W.dot(modelmat[mask, :])  # common matrix product
             Q, R = np.linalg.qr(WB.A)
 
             if not np.isfinite(Q).all() or not np.isfinite(R).all():
-                raise ValueError('QR decomposition produced NaN or Inf. '\
-                                     'Check X data.')
+                raise ValueError(
+                    "QR decomposition produced NaN or Inf. " "Check X data."
+                )
 
             # need to recompute the number of singular values
             min_n_m = np.min([m, n, mask.sum()])
@@ -747,16 +798,16 @@ class GAM(Core, MetaTermMixin):
 
             # SVD
             U, d, Vt = np.linalg.svd(np.vstack([R, E]))
-            svd_mask = d <= (d.max() * np.sqrt(EPS)) # mask out small singular values
+            svd_mask = d <= (d.max() * np.sqrt(EPS))  # mask out small singular values
 
-            np.fill_diagonal(Dinv, d**-1) # invert the singular values
-            U1 = U[:min_n_m,:min_n_m] # keep only top corner of U
+            np.fill_diagonal(Dinv, d**-1)  # invert the singular values
+            U1 = U[:min_n_m, :min_n_m]  # keep only top corner of U
 
             # update coefficients
             B = Vt.T.dot(Dinv).dot(U1.T).dot(Q.T)
             coef_new = B.dot(pseudo_data).flatten()
-            diff = np.linalg.norm(self.coef_ - coef_new)/np.linalg.norm(coef_new)
-            self.coef_ = coef_new # update
+            diff = np.linalg.norm(self.coef_ - coef_new) / np.linalg.norm(coef_new)
+            self.coef_ = coef_new  # update
 
             # log on-loop-end stats
             self._on_loop_end(vars())
@@ -766,12 +817,13 @@ class GAM(Core, MetaTermMixin):
                 break
 
         # estimate statistics even if not converged
-        self._estimate_model_statistics(Y, modelmat, inner=None, BW=WB.T, B=B,
-                                        weights=weights, U1=U1)
+        self._estimate_model_statistics(
+            Y, modelmat, inner=None, BW=WB.T, B=B, weights=weights, U1=U1
+        )
         if diff < self.tol:
             return
 
-        print('did not converge')
+        print("did not converge")
         return
 
     # def _pirls_naive(self, X, y):
@@ -846,7 +898,7 @@ class GAM(Core, MetaTermMixin):
         None
         """
         for callback in self.callbacks:
-            if hasattr(callback, 'on_loop_start'):
+            if hasattr(callback, "on_loop_start"):
                 self.logs_[str(callback)].append(callback.on_loop_start(**variables))
 
     def _on_loop_end(self, variables):
@@ -864,7 +916,7 @@ class GAM(Core, MetaTermMixin):
         None
         """
         for callback in self.callbacks:
-            if hasattr(callback, 'on_loop_end'):
+            if hasattr(callback, "on_loop_end"):
                 self.logs_[str(callback)].append(callback.on_loop_end(**variables))
 
     def fit(self, X, y, weights=None):
@@ -897,24 +949,25 @@ class GAM(Core, MetaTermMixin):
         check_X_y(X, y)
 
         if weights is not None:
-            weights = np.array(weights).astype('f').ravel()
-            weights = check_array(weights, name='sample weights',
-                                  ndim=1, verbose=self.verbose)
+            weights = np.array(weights).astype("f").ravel()
+            weights = check_array(
+                weights, name="sample weights", ndim=1, verbose=self.verbose
+            )
             check_lengths(y, weights)
         else:
-            weights = np.ones_like(y).astype('float64')
+            weights = np.ones_like(y).astype("float64")
 
         # validate data-dependent parameters
         self._validate_data_dep_params(X)
 
         # set up logging
-        if not hasattr(self, 'logs_'):
+        if not hasattr(self, "logs_"):
             self.logs_ = defaultdict(list)
 
         # begin capturing statistics
         self.statistics_ = {}
-        self.statistics_['n_samples'] = len(y)
-        self.statistics_['m_features'] = X.shape[1]
+        self.statistics_["n_samples"] = len(y)
+        self.statistics_["m_features"] = X.shape[1]
 
         # optimize
         self._pirls(X, y, weights)
@@ -945,7 +998,7 @@ class GAM(Core, MetaTermMixin):
         """
         r2 = self._estimate_r2(X=X, y=y, mu=None, weights=weights)
 
-        return r2['explained_deviance']
+        return r2["explained_deviance"]
 
     def deviance_residuals(self, X, y, weights=None, scaled=False):
         """
@@ -971,30 +1024,38 @@ class GAM(Core, MetaTermMixin):
             with shape (n_samples,)
         """
         if not self._is_fitted:
-            raise AttributeError('GAM has not been fitted. Call fit first.')
+            raise AttributeError("GAM has not been fitted. Call fit first.")
 
         y = check_y(y, self.link, self.distribution, verbose=self.verbose)
-        X = check_X(X, n_feats=self.statistics_['m_features'],
-                    edge_knots=self.edge_knots_, dtypes=self.dtype,
-                    features=self.feature, verbose=self.verbose)
+        X = check_X(
+            X,
+            n_feats=self.statistics_["m_features"],
+            edge_knots=self.edge_knots_,
+            dtypes=self.dtype,
+            features=self.feature,
+            verbose=self.verbose,
+        )
         check_X_y(X, y)
 
         if weights is not None:
-            weights = np.array(weights).astype('f').ravel()
-            weights = check_array(weights, name='sample weights',
-                                  ndim=1, verbose=self.verbose)
+            weights = np.array(weights).astype("f").ravel()
+            weights = check_array(
+                weights, name="sample weights", ndim=1, verbose=self.verbose
+            )
             check_lengths(y, weights)
         else:
-            weights = np.ones_like(y).astype('float64')
+            weights = np.ones_like(y).astype("float64")
 
         mu = self.predict_mu(X)
-        sign = np.sign(y-mu)
-        return sign * self.distribution.deviance(y, mu,
-                                                 weights=weights,
-                                                 scaled=scaled) ** 0.5
+        sign = np.sign(y - mu)
+        return (
+            sign
+            * self.distribution.deviance(y, mu, weights=weights, scaled=scaled) ** 0.5
+        )
 
-    def _estimate_model_statistics(self, y, modelmat, inner=None, BW=None,
-                                   B=None, weights=None, U1=None):
+    def _estimate_model_statistics(
+        self, y, modelmat, inner=None, BW=None, B=None, weights=None, U1=None
+    ):
         """
         method to compute all of the model statistics
 
@@ -1032,20 +1093,28 @@ class GAM(Core, MetaTermMixin):
         """
         lp = self._linear_predictor(modelmat=modelmat)
         mu = self.link.mu(lp, self.distribution)
-        self.statistics_['edof_per_coef'] = np.diagonal(U1.dot(U1.T))
-        self.statistics_['edof'] = self.statistics_['edof_per_coef'].sum()
+        self.statistics_["edof_per_coef"] = np.diagonal(U1.dot(U1.T))
+        self.statistics_["edof"] = self.statistics_["edof_per_coef"].sum()
         if not self.distribution._known_scale:
-            self.distribution.scale = self.distribution.phi(y=y, mu=mu, edof=self.statistics_['edof'], weights=weights)
-        self.statistics_['scale'] = self.distribution.scale
-        self.statistics_['cov'] = (B.dot(B.T)) * self.distribution.scale # parameter covariances. no need to remove a W because we are using W^2. Wood pg 184
-        self.statistics_['se'] = self.statistics_['cov'].diagonal()**0.5
-        self.statistics_['AIC'] = self._estimate_AIC(y=y, mu=mu, weights=weights)
-        self.statistics_['AICc'] = self._estimate_AICc(y=y, mu=mu, weights=weights)
-        self.statistics_['pseudo_r2'] = self._estimate_r2(y=y, mu=mu, weights=weights)
-        self.statistics_['GCV'], self.statistics_['UBRE'] = self._estimate_GCV_UBRE(modelmat=modelmat, y=y, weights=weights)
-        self.statistics_['loglikelihood'] = self._loglikelihood(y, mu, weights=weights)
-        self.statistics_['deviance'] = self.distribution.deviance(y=y, mu=mu, weights=weights).sum()
-        self.statistics_['p_values'] = self._estimate_p_values()
+            self.distribution.scale = self.distribution.phi(
+                y=y, mu=mu, edof=self.statistics_["edof"], weights=weights
+            )
+        self.statistics_["scale"] = self.distribution.scale
+        self.statistics_["cov"] = (
+            B.dot(B.T)
+        ) * self.distribution.scale  # parameter covariances. no need to remove a W because we are using W^2. Wood pg 184
+        self.statistics_["se"] = self.statistics_["cov"].diagonal() ** 0.5
+        self.statistics_["AIC"] = self._estimate_AIC(y=y, mu=mu, weights=weights)
+        self.statistics_["AICc"] = self._estimate_AICc(y=y, mu=mu, weights=weights)
+        self.statistics_["pseudo_r2"] = self._estimate_r2(y=y, mu=mu, weights=weights)
+        self.statistics_["GCV"], self.statistics_["UBRE"] = self._estimate_GCV_UBRE(
+            modelmat=modelmat, y=y, weights=weights
+        )
+        self.statistics_["loglikelihood"] = self._loglikelihood(y, mu, weights=weights)
+        self.statistics_["deviance"] = self.distribution.deviance(
+            y=y, mu=mu, weights=weights
+        ).sum()
+        self.statistics_["p_values"] = self._estimate_p_values()
 
     def _estimate_AIC(self, y, mu, weights=None):
         """
@@ -1065,9 +1134,14 @@ class GAM(Core, MetaTermMixin):
         -------
         None
         """
-        estimated_scale = not(self.distribution._known_scale) # if we estimate the scale, that adds 2 dof
-        return -2*self._loglikelihood(y=y, mu=mu, weights=weights) + \
-                2*self.statistics_['edof'] + 2*estimated_scale
+        estimated_scale = not (
+            self.distribution._known_scale
+        )  # if we estimate the scale, that adds 2 dof
+        return (
+            -2 * self._loglikelihood(y=y, mu=mu, weights=weights)
+            + 2 * self.statistics_["edof"]
+            + 2 * estimated_scale
+        )
 
     def _estimate_AICc(self, y, mu, weights=None):
         """
@@ -1090,10 +1164,12 @@ class GAM(Core, MetaTermMixin):
         -------
         None
         """
-        edof = self.statistics_['edof']
-        if self.statistics_['AIC'] is None:
-            self.statistics_['AIC'] = self._estimate_AIC(y, mu, weights)
-        return self.statistics_['AIC'] + 2*(edof + 1)*(edof + 2)/(y.shape[0] - edof -2)
+        edof = self.statistics_["edof"]
+        if self.statistics_["AIC"] is None:
+            self.statistics_["AIC"] = self._estimate_AIC(y, mu, weights)
+        return self.statistics_["AIC"] + 2 * (edof + 1) * (edof + 2) / (
+            y.shape[0] - edof - 2
+        )
 
     def _estimate_r2(self, X=None, y=None, mu=None, weights=None):
         """
@@ -1120,9 +1196,9 @@ class GAM(Core, MetaTermMixin):
             mu = self.predict_mu(X=X)
 
         if weights is None:
-            weights = np.ones_like(y).astype('float64')
+            weights = np.ones_like(y).astype("float64")
 
-        null_mu = y.mean() * np.ones_like(y).astype('float64')
+        null_mu = y.mean() * np.ones_like(y).astype("float64")
 
         null_d = self.distribution.deviance(y=y, mu=null_mu, weights=weights)
         full_d = self.distribution.deviance(y=y, mu=mu, weights=weights)
@@ -1131,14 +1207,15 @@ class GAM(Core, MetaTermMixin):
         full_ll = self._loglikelihood(y=y, mu=mu, weights=weights)
 
         r2 = OrderedDict()
-        r2['explained_deviance'] = 1. - full_d.sum()/null_d.sum()
-        r2['McFadden'] = full_ll/null_ll
-        r2['McFadden_adj'] = 1. - (full_ll - self.statistics_['edof'])/null_ll
+        r2["explained_deviance"] = 1.0 - full_d.sum() / null_d.sum()
+        r2["McFadden"] = full_ll / null_ll
+        r2["McFadden_adj"] = 1.0 - (full_ll - self.statistics_["edof"]) / null_ll
 
         return r2
 
-    def _estimate_GCV_UBRE(self, X=None, y=None, modelmat=None, gamma=1.4,
-                           add_scale=True, weights=None):
+    def _estimate_GCV_UBRE(
+        self, X=None, y=None, modelmat=None, gamma=1.4, add_scale=True, weights=None
+    ):
         """
         Generalized Cross Validation and Un-Biased Risk Estimator.
 
@@ -1176,39 +1253,44 @@ class GAM(Core, MetaTermMixin):
         see Wood 2006 pg. 177-182, 220 for more details.
         """
         if gamma < 1:
-            raise ValueError('gamma scaling should be greater than 1, '\
-                             'but found gamma = {}',format(gamma))
+            raise ValueError(
+                "gamma scaling should be greater than 1, " "but found gamma = {}",
+                format(gamma),
+            )
 
         if modelmat is None:
             modelmat = self._modelmat(X)
 
         if weights is None:
-            weights = np.ones_like(y).astype('float64')
+            weights = np.ones_like(y).astype("float64")
 
         lp = self._linear_predictor(modelmat=modelmat)
         mu = self.link.mu(lp, self.distribution)
         n = y.shape[0]
-        edof = self.statistics_['edof']
+        edof = self.statistics_["edof"]
 
         GCV = None
         UBRE = None
 
-        dev = self.distribution.deviance(mu=mu, y=y, scaled=False, weights=weights).sum()
+        dev = self.distribution.deviance(
+            mu=mu, y=y, scaled=False, weights=weights
+        ).sum()
 
         if self.distribution._known_scale:
             # scale is known, use UBRE
             scale = self.distribution.scale
-            UBRE = 1./n *  dev - (~add_scale)*(scale) + 2.*gamma/n * edof * scale
+            UBRE = (
+                1.0 / n * dev - (~add_scale) * (scale) + 2.0 * gamma / n * edof * scale
+            )
         else:
             # scale unkown, use GCV
-            GCV = (n * dev) / (n - gamma * edof)**2
+            GCV = (n * dev) / (n - gamma * edof) ** 2
         return (GCV, UBRE)
 
     def _estimate_p_values(self):
-        """estimate the p-values for all features
-        """
+        """estimate the p-values for all features"""
         if not self._is_fitted:
-            raise AttributeError('GAM has not been fitted. Call fit first.')
+            raise AttributeError("GAM has not been fitted. Call fit first.")
 
         p_values = []
         for term_i in range(len(self.terms)):
@@ -1248,10 +1330,10 @@ class GAM(Core, MetaTermMixin):
         the errata shows a correction for the f-statisitc.
         """
         if not self._is_fitted:
-            raise AttributeError('GAM has not been fitted. Call fit first.')
+            raise AttributeError("GAM has not been fitted. Call fit first.")
 
         idxs = self.terms.get_coef_indices(term_i)
-        cov = self.statistics_['cov'][idxs][:, idxs]
+        cov = self.statistics_["cov"][idxs][:, idxs]
         coef = self.coef_[idxs]
 
         # center non-intercept term functions
@@ -1268,9 +1350,11 @@ class GAM(Core, MetaTermMixin):
         else:
             # if scale has been estimated, prefer to use f-statisitc
             score = score / rank
-            return 1 - sp.stats.f.cdf(score, rank, self.statistics_['n_samples'] - self.statistics_['edof'])
+            return 1 - sp.stats.f.cdf(
+                score, rank, self.statistics_["n_samples"] - self.statistics_["edof"]
+            )
 
-    def confidence_intervals(self, X, width=.95, quantiles=None):
+    def confidence_intervals(self, X, width=0.95, quantiles=None):
         """estimate confidence intervals for the model.
 
         Parameters
@@ -1295,16 +1379,30 @@ class GAM(Core, MetaTermMixin):
             reality they are estimated from the data.
         """
         if not self._is_fitted:
-            raise AttributeError('GAM has not been fitted. Call fit first.')
+            raise AttributeError("GAM has not been fitted. Call fit first.")
 
-        X = check_X(X, n_feats=self.statistics_['m_features'],
-                    edge_knots=self.edge_knots_, dtypes=self.dtype,
-                    features=self.feature, verbose=self.verbose)
+        X = check_X(
+            X,
+            n_feats=self.statistics_["m_features"],
+            edge_knots=self.edge_knots_,
+            dtypes=self.dtype,
+            features=self.feature,
+            verbose=self.verbose,
+        )
 
         return self._get_quantiles(X, width, quantiles, prediction=False)
 
-    def _get_quantiles(self, X, width, quantiles, modelmat=None, lp=None,
-                       prediction=False, xform=True, term=-1):
+    def _get_quantiles(
+        self,
+        X,
+        width,
+        quantiles,
+        modelmat=None,
+        lp=None,
+        prediction=False,
+        xform=True,
+        term=-1,
+    ):
         """
         estimate prediction intervals for LinearGAM
 
@@ -1347,12 +1445,13 @@ class GAM(Core, MetaTermMixin):
         if quantiles is not None:
             quantiles = np.atleast_1d(quantiles)
         else:
-            alpha = (1 - width)/2.
+            alpha = (1 - width) / 2.0
             quantiles = [alpha, 1 - alpha]
         for quantile in quantiles:
             if (quantile >= 1) or (quantile <= 0):
-                raise ValueError('quantiles must be in (0, 1), but found {}'\
-                                 .format(quantiles))
+                raise ValueError(
+                    "quantiles must be in (0, 1), but found {}".format(quantiles)
+                )
 
         if modelmat is None:
             modelmat = self._modelmat(X, term=term)
@@ -1360,7 +1459,7 @@ class GAM(Core, MetaTermMixin):
             lp = self._linear_predictor(modelmat=modelmat, term=term)
 
         idxs = self.terms.get_coef_indices(term)
-        cov = self.statistics_['cov'][idxs][:, idxs]
+        cov = self.statistics_["cov"][idxs][:, idxs]
 
         var = (modelmat.dot(cov) * modelmat.A).sum(axis=1)
         if prediction:
@@ -1371,8 +1470,10 @@ class GAM(Core, MetaTermMixin):
             if self.distribution._known_scale:
                 q = sp.stats.norm.ppf(quantile)
             else:
-                q = sp.stats.t.ppf(quantile, df=self.statistics_['n_samples'] -
-                                                self.statistics_['edof'])
+                q = sp.stats.t.ppf(
+                    quantile,
+                    df=self.statistics_["n_samples"] - self.statistics_["edof"],
+                )
 
             lines.append(lp + q * var**0.5)
         lines = np.vstack(lines).T
@@ -1390,7 +1491,7 @@ class GAM(Core, MetaTermMixin):
         else:
             terms = [self.terms[term]]
 
-        X = np.zeros((n, self.statistics_['m_features']))
+        X = np.zeros((n, self.statistics_["m_features"]))
         for term_, x in zip(terms, Xs):
             X[:, term_.feature] = x.ravel()
         return X
@@ -1437,49 +1538,50 @@ class GAM(Core, MetaTermMixin):
             since it does not make sense to process the intercept term.
         """
         if not self._is_fitted:
-            raise AttributeError('GAM has not been fitted. Call fit first.')
+            raise AttributeError("GAM has not been fitted. Call fit first.")
 
         # cant do Intercept
         if self.terms[term].isintercept:
-            raise ValueError('cannot create grid for intercept term')
+            raise ValueError("cannot create grid for intercept term")
 
         # process each subterm in a TensorTerm
         if self.terms[term].istensor:
             Xs = []
             for term_ in self.terms[term]:
-                Xs.append(np.linspace(term_.edge_knots_[0],
-                                      term_.edge_knots_[1],
-                                      num=n))
+                Xs.append(
+                    np.linspace(term_.edge_knots_[0], term_.edge_knots_[1], num=n)
+                )
 
-            Xs = np.meshgrid(*Xs, indexing='ij')
+            Xs = np.meshgrid(*Xs, indexing="ij")
             if meshgrid:
                 return tuple(Xs)
             else:
                 return self._flatten_mesh(Xs, term=term)
 
         # all other Terms
-        elif hasattr(self.terms[term], 'edge_knots_'):
-            x = np.linspace(self.terms[term].edge_knots_[0],
-                            self.terms[term].edge_knots_[1],
-                            num=n)
+        elif hasattr(self.terms[term], "edge_knots_"):
+            x = np.linspace(
+                self.terms[term].edge_knots_[0], self.terms[term].edge_knots_[1], num=n
+            )
 
             if meshgrid:
                 return (x,)
 
             # fill in feature matrix with only relevant features for this term
-            X = np.zeros((n, self.statistics_['m_features']))
+            X = np.zeros((n, self.statistics_["m_features"]))
             X[:, self.terms[term].feature] = x
-            if getattr(self.terms[term], 'by', None) is not None:
-                X[:, self.terms[term].by] = 1.
+            if getattr(self.terms[term], "by", None) is not None:
+                X[:, self.terms[term].by] = 1.0
 
             return X
 
         # dont know what to do here
         else:
-            raise TypeError('Unexpected term type: {}'.format(self.terms[term]))
+            raise TypeError("Unexpected term type: {}".format(self.terms[term]))
 
-    def partial_dependence(self, term, X=None, width=None, quantiles=None,
-                           meshgrid=False):
+    def partial_dependence(
+        self, term, X=None, width=None, quantiles=None, meshgrid=False
+    ):
         """
         Computes the term functions for the GAM
         and possibly their confidence intervals.
@@ -1536,33 +1638,43 @@ class GAM(Core, MetaTermMixin):
         generate_X_grid : for help creating meshgrids.
         """
         if not self._is_fitted:
-            raise AttributeError('GAM has not been fitted. Call fit first.')
+            raise AttributeError("GAM has not been fitted. Call fit first.")
 
         if not isinstance(term, int):
-            raise ValueError('term must be an integer, but found term: {}'.format(term))
+            raise ValueError("term must be an integer, but found term: {}".format(term))
 
         # ensure term exists
         if (term >= len(self.terms)) or (term < -1):
-            raise ValueError('Term {} out of range for model with {} terms'\
-                             .format(term, len(self.terms)))
+            raise ValueError(
+                "Term {} out of range for model with {} terms".format(
+                    term, len(self.terms)
+                )
+            )
 
         # cant do Intercept
         if self.terms[term].isintercept:
-            raise ValueError('cannot create grid for intercept term')
+            raise ValueError("cannot create grid for intercept term")
 
         if X is None:
             X = self.generate_X_grid(term=term, meshgrid=meshgrid)
 
         if meshgrid:
             if not isinstance(X, tuple):
-                raise ValueError('X must be a tuple of grids if `meshgrid=True`, '\
-                                 'but found X: {}'.format(X))
+                raise ValueError(
+                    "X must be a tuple of grids if `meshgrid=True`, "
+                    "but found X: {}".format(X)
+                )
             shape = X[0].shape
 
             X = self._flatten_mesh(X, term=term)
-            X = check_X(X, n_feats=self.statistics_['m_features'],
-                        edge_knots=self.edge_knots_, dtypes=self.dtype,
-                        features=self.feature, verbose=self.verbose)
+            X = check_X(
+                X,
+                n_feats=self.statistics_["m_features"],
+                edge_knots=self.edge_knots_,
+                dtypes=self.dtype,
+                features=self.feature,
+                verbose=self.verbose,
+            )
 
         modelmat = self._modelmat(X, term=term)
         pdep = self._linear_predictor(modelmat=modelmat, term=term)
@@ -1570,12 +1682,15 @@ class GAM(Core, MetaTermMixin):
 
         compute_quantiles = (width is not None) or (quantiles is not None)
         if compute_quantiles:
-            conf_intervals = self._get_quantiles(X, width=width,
-                                                 quantiles=quantiles,
-                                                 modelmat=modelmat,
-                                                 lp=pdep,
-                                                 term=term,
-                                                 xform=False)
+            conf_intervals = self._get_quantiles(
+                X,
+                width=width,
+                quantiles=quantiles,
+                modelmat=modelmat,
+                lp=pdep,
+                term=term,
+                xform=False,
+            )
 
             out += [conf_intervals]
 
@@ -1604,31 +1719,101 @@ class GAM(Core, MetaTermMixin):
         None
         """
         if not self._is_fitted:
-            raise AttributeError('GAM has not been fitted. Call fit first.')
+            raise AttributeError("GAM has not been fitted. Call fit first.")
 
         # high-level model summary
         width_details = 47
         width_results = 58
 
         model_fmt = [
-            (self.__class__.__name__, 'model_details', width_details),
-            ('', 'model_results', width_results)
-            ]
+            (self.__class__.__name__, "model_details", width_details),
+            ("", "model_results", width_results),
+        ]
 
         model_details = []
 
-        objective = 'UBRE' if self.distribution._known_scale else 'GCV'
+        objective = "UBRE" if self.distribution._known_scale else "GCV"
 
-        model_details.append({'model_details': space_row('Distribution:', self.distribution.__class__.__name__, total_width=width_details),
-                              'model_results': space_row('Effective DoF:', str(np.round(self.statistics_['edof'], 4)), total_width=width_results)})
-        model_details.append({'model_details': space_row('Link Function:', self.link.__class__.__name__, total_width=width_details),
-                              'model_results': space_row('Log Likelihood:', str(np.round(self.statistics_['loglikelihood'], 4)), total_width=width_results)})
-        model_details.append({'model_details': space_row('Number of Samples:', str(self.statistics_['n_samples']), total_width=width_details),
-                              'model_results': space_row('AIC: ', str(np.round(self.statistics_['AIC'], 4)), total_width=width_results)})
-        model_details.append({'model_results': space_row('AICc: ', str(np.round(self.statistics_['AICc'], 4)), total_width=width_results)})
-        model_details.append({'model_results': space_row(objective + ':', str(np.round(self.statistics_[objective], 4)), total_width=width_results)})
-        model_details.append({'model_results': space_row('Scale:', str(np.round(self.statistics_['scale'], 4)), total_width=width_results)})
-        model_details.append({'model_results': space_row('Pseudo R-Squared:', str(np.round(self.statistics_['pseudo_r2']['explained_deviance'], 4)), total_width=width_results)})
+        model_details.append(
+            {
+                "model_details": space_row(
+                    "Distribution:",
+                    self.distribution.__class__.__name__,
+                    total_width=width_details,
+                ),
+                "model_results": space_row(
+                    "Effective DoF:",
+                    str(np.round(self.statistics_["edof"], 4)),
+                    total_width=width_results,
+                ),
+            }
+        )
+        model_details.append(
+            {
+                "model_details": space_row(
+                    "Link Function:",
+                    self.link.__class__.__name__,
+                    total_width=width_details,
+                ),
+                "model_results": space_row(
+                    "Log Likelihood:",
+                    str(np.round(self.statistics_["loglikelihood"], 4)),
+                    total_width=width_results,
+                ),
+            }
+        )
+        model_details.append(
+            {
+                "model_details": space_row(
+                    "Number of Samples:",
+                    str(self.statistics_["n_samples"]),
+                    total_width=width_details,
+                ),
+                "model_results": space_row(
+                    "AIC: ",
+                    str(np.round(self.statistics_["AIC"], 4)),
+                    total_width=width_results,
+                ),
+            }
+        )
+        model_details.append(
+            {
+                "model_results": space_row(
+                    "AICc: ",
+                    str(np.round(self.statistics_["AICc"], 4)),
+                    total_width=width_results,
+                )
+            }
+        )
+        model_details.append(
+            {
+                "model_results": space_row(
+                    objective + ":",
+                    str(np.round(self.statistics_[objective], 4)),
+                    total_width=width_results,
+                )
+            }
+        )
+        model_details.append(
+            {
+                "model_results": space_row(
+                    "Scale:",
+                    str(np.round(self.statistics_["scale"], 4)),
+                    total_width=width_results,
+                )
+            }
+        )
+        model_details.append(
+            {
+                "model_results": space_row(
+                    "Pseudo R-Squared:",
+                    str(
+                        np.round(self.statistics_["pseudo_r2"]["explained_deviance"], 4)
+                    ),
+                    total_width=width_results,
+                )
+            }
+        )
 
         # term summary
         data = []
@@ -1637,56 +1822,70 @@ class GAM(Core, MetaTermMixin):
 
             # TODO bug: if the number of samples is less than the number of coefficients
             # we cant get the edof per term
-            if len(self.statistics_['edof_per_coef']) == len(self.coef_):
+            if len(self.statistics_["edof_per_coef"]) == len(self.coef_):
                 idx = self.terms.get_coef_indices(i)
-                edof = np.round(self.statistics_['edof_per_coef'][idx].sum(), 1)
+                edof = np.round(self.statistics_["edof_per_coef"][idx].sum(), 1)
             else:
-                edof = ''
+                edof = ""
 
             term_data = {
-                        'feature_func': repr(term),
-                        'lam': '' if term.isintercept else np.round(flatten(term.lam), 4),
-                        'rank': '{}'.format(term.n_coefs),
-                        'edof': '{}'.format(edof),
-                        'p_value': '%.2e'%(self.statistics_['p_values'][i]),
-                        'sig_code': sig_code(self.statistics_['p_values'][i])
-                        }
+                "feature_func": repr(term),
+                "lam": "" if term.isintercept else np.round(flatten(term.lam), 4),
+                "rank": "{}".format(term.n_coefs),
+                "edof": "{}".format(edof),
+                "p_value": "%.2e" % (self.statistics_["p_values"][i]),
+                "sig_code": sig_code(self.statistics_["p_values"][i]),
+            }
 
             data.append(term_data)
 
         fmt = [
-            ('Feature Function', 'feature_func', 33),
-            ('Lambda', 'lam', 20),
-            ('Rank', 'rank', 12),
-            ('EDoF', 'edof', 12),
-            ('P > x', 'p_value', 12),
-            ('Sig. Code', 'sig_code', 12)
-            ]
+            ("Feature Function", "feature_func", 33),
+            ("Lambda", "lam", 20),
+            ("Rank", "rank", 12),
+            ("EDoF", "edof", 12),
+            ("P > x", "p_value", 12),
+            ("Sig. Code", "sig_code", 12),
+        ]
 
-        print( TablePrinter(model_fmt, ul='=', sep=' ')(model_details) )
-        print("="*106)
-        print( TablePrinter(fmt, ul='=')(data) )
-        print("="*106)
+        print(TablePrinter(model_fmt, ul="=", sep=" ")(model_details))
+        print("=" * 106)
+        print(TablePrinter(fmt, ul="=")(data))
+        print("=" * 106)
         print("Significance codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1")
         print()
-        print("WARNING: Fitting splines and a linear function to a feature introduces a model identifiability problem\n" \
-              "         which can cause p-values to appear significant when they are not.")
+        print(
+            "WARNING: Fitting splines and a linear function to a feature introduces a model identifiability problem\n"
+            "         which can cause p-values to appear significant when they are not."
+        )
         print()
-        print("WARNING: p-values calculated in this manner behave correctly for un-penalized models or models with\n" \
-              "         known smoothing parameters, but when smoothing parameters have been estimated, the p-values\n" \
-              "         are typically lower than they should be, meaning that the tests reject the null too readily.")
+        print(
+            "WARNING: p-values calculated in this manner behave correctly for un-penalized models or models with\n"
+            "         known smoothing parameters, but when smoothing parameters have been estimated, the p-values\n"
+            "         are typically lower than they should be, meaning that the tests reject the null too readily."
+        )
 
         # P-VALUE BUG
-        warnings.warn("KNOWN BUG: p-values computed in this summary are likely "\
-                      "much smaller than they should be. \n \n"\
-                      "Please do not make inferences based on these values! \n\n"\
-                      "Collaborate on a solution, and stay up to date at: \n"\
-                      "github.com/dswah/pyGAM/issues/163 \n", stacklevel=2)
+        warnings.warn(
+            "KNOWN BUG: p-values computed in this summary are likely "
+            "much smaller than they should be. \n \n"
+            "Please do not make inferences based on these values! \n\n"
+            "Collaborate on a solution, and stay up to date at: \n"
+            "github.com/dswah/pyGAM/issues/163 \n",
+            stacklevel=2,
+        )
 
-
-    def gridsearch(self, X, y, weights=None, return_scores=False,
-                   keep_best=True, objective='auto', progress=True,
-                   **param_grids):
+    def gridsearch(
+        self,
+        X,
+        y,
+        weights=None,
+        return_scores=False,
+        keep_best=True,
+        objective="auto",
+        progress=True,
+        **param_grids
+    ):
         """
         Performs a grid search over a space of parameters for a given
         objective
@@ -1800,37 +1999,40 @@ class GAM(Core, MetaTermMixin):
         check_X_y(X, y)
 
         if weights is not None:
-            weights = np.array(weights).astype('f').ravel()
-            weights = check_array(weights, name='sample weights',
-                                  ndim=1, verbose=self.verbose)
+            weights = np.array(weights).astype("f").ravel()
+            weights = check_array(
+                weights, name="sample weights", ndim=1, verbose=self.verbose
+            )
             check_lengths(y, weights)
         else:
-            weights = np.ones_like(y).astype('float64')
+            weights = np.ones_like(y).astype("float64")
 
         # validate objective
-        if objective not in ['auto', 'GCV', 'UBRE', 'AIC', 'AICc']:
-            raise ValueError("objective mut be in "\
-                             "['auto', 'GCV', 'UBRE', 'AIC', 'AICc'], '\
-                             'but found objective = {}".format(objective))
+        if objective not in ["auto", "GCV", "UBRE", "AIC", "AICc"]:
+            raise ValueError(
+                "objective mut be in "
+                "['auto', 'GCV', 'UBRE', 'AIC', 'AICc'], '\
+                             'but found objective = {}".format(
+                    objective
+                )
+            )
 
         # check objective
         if self.distribution._known_scale:
-            if objective == 'GCV':
-                raise ValueError('GCV should be used for models with'\
-                                 'unknown scale')
-            if objective == 'auto':
-                objective = 'UBRE'
+            if objective == "GCV":
+                raise ValueError("GCV should be used for models with" "unknown scale")
+            if objective == "auto":
+                objective = "UBRE"
 
         else:
-            if objective == 'UBRE':
-                raise ValueError('UBRE should be used for models with '\
-                                 'known scale')
-            if objective == 'auto':
-                objective = 'GCV'
+            if objective == "UBRE":
+                raise ValueError("UBRE should be used for models with " "known scale")
+            if objective == "auto":
+                objective = "GCV"
 
         # if no params, then set up default gridsearch
         if not bool(param_grids):
-            param_grids['lam'] = np.logspace(-3, 3, 11)
+            param_grids["lam"] = np.logspace(-3, 3, 11)
 
         # validate params
         admissible_params = list(self.get_params()) + self._plural
@@ -1840,13 +2042,15 @@ class GAM(Core, MetaTermMixin):
 
             # check param exists
             if param not in (admissible_params):
-                raise ValueError('unknown parameter: {}'.format(param))
+                raise ValueError("unknown parameter: {}".format(param))
 
             # check grid is iterable at all
-            if not (isiterable(grid) and (len(grid) > 1)): \
-                raise ValueError('{} grid must either be iterable of '
-                                 'iterables, or an iterable of lengnth > 1, '\
-                                 'but found {}'.format(param, grid))
+            if not (isiterable(grid) and (len(grid) > 1)):
+                raise ValueError(
+                    "{} grid must either be iterable of "
+                    "iterables, or an iterable of lengnth > 1, "
+                    "but found {}".format(param, grid)
+                )
 
             # prepare grid
             if any(isiterable(g) for g in grid):
@@ -1855,14 +2059,18 @@ class GAM(Core, MetaTermMixin):
                 target_len = len(flatten(getattr(self, param)))
 
                 # check if cartesian product needed
-                cartesian = (not isinstance(grid, np.ndarray) or grid.ndim != 2)
+                cartesian = not isinstance(grid, np.ndarray) or grid.ndim != 2
 
                 # build grid
                 grid = [np.atleast_1d(g) for g in grid]
 
                 # check chape
-                msg = '{} grid should have {} columns, '\
-                      'but found grid with {} columns'.format(param, target_len, len(grid))
+                msg = (
+                    "{} grid should have {} columns, "
+                    "but found grid with {} columns".format(
+                        param, target_len, len(grid)
+                    )
+                )
                 if cartesian:
                     if len(grid) != target_len:
                         raise ValueError(msg)
@@ -1878,10 +2086,10 @@ class GAM(Core, MetaTermMixin):
         # build a list of dicts of candidate model params
         param_grid_list = []
         for candidate in combine(*grids):
-            param_grid_list.append(dict(zip(params,candidate)))
+            param_grid_list.append(dict(zip(params, candidate)))
 
         # set up data collection
-        best_model = None # keep the best model
+        best_model = None  # keep the best model
         best_score = np.inf
         scores = []
         models = []
@@ -1917,8 +2125,8 @@ class GAM(Core, MetaTermMixin):
                 gam.fit(X, y, weights)
 
             except ValueError as error:
-                msg = str(error) + '\non model with params:\n' + str(param_grid)
-                msg += '\nskipping...\n'
+                msg = str(error) + "\non model with params:\n" + str(param_grid)
+                msg += "\nskipping...\n"
                 if self.verbose:
                     warnings.warn(msg)
                 continue
@@ -1934,23 +2142,30 @@ class GAM(Core, MetaTermMixin):
 
         # problems
         if len(models) == 0:
-            msg = 'No models were fitted.'
+            msg = "No models were fitted."
             if self.verbose:
                 warnings.warn(msg)
             return self
 
         # copy over the best
         if keep_best:
-            self.set_params(deep=True,
-                            force=True,
-                            **best_model.get_params(deep=True))
+            self.set_params(deep=True, force=True, **best_model.get_params(deep=True))
         if return_scores:
             return OrderedDict(zip(models, scores))
         else:
             return self
 
-    def sample(self, X, y, quantity='y', sample_at_X=None,
-               weights=None, n_draws=100, n_bootstraps=5, objective='auto'):
+    def sample(
+        self,
+        X,
+        y,
+        quantity="y",
+        sample_at_X=None,
+        weights=None,
+        n_draws=100,
+        n_bootstraps=5,
+        objective="auto",
+    ):
         """Simulate from the posterior of the coefficients and smoothing params.
 
         Samples are drawn from the posterior of the coefficients and smoothing
@@ -2044,15 +2259,22 @@ class GAM(Core, MetaTermMixin):
         Simon N. Wood, 2006. Generalized Additive Models: an introduction with
         R. Section 4.9.3 (pages 198–199) and Section 5.4.2 (page 256–257).
         """
-        if quantity not in {'mu', 'coef', 'y'}:
-            raise ValueError("`quantity` must be one of 'mu', 'coef', 'y';"
-                             " got {}".format(quantity))
+        if quantity not in {"mu", "coef", "y"}:
+            raise ValueError(
+                "`quantity` must be one of 'mu', 'coef', 'y';"
+                " got {}".format(quantity)
+            )
 
         coef_draws = self._sample_coef(
-            X, y, weights=weights, n_draws=n_draws,
-            n_bootstraps=n_bootstraps, objective=objective)
+            X,
+            y,
+            weights=weights,
+            n_draws=n_draws,
+            n_bootstraps=n_bootstraps,
+            objective=objective,
+        )
 
-        if quantity == 'coef':
+        if quantity == "coef":
             return coef_draws
 
         if sample_at_X is None:
@@ -2060,14 +2282,16 @@ class GAM(Core, MetaTermMixin):
 
         linear_predictor = self._modelmat(sample_at_X).dot(coef_draws.T)
         mu_shape_n_draws_by_n_samples = self.link.mu(
-            linear_predictor, self.distribution).T
-        if quantity == 'mu':
+            linear_predictor, self.distribution
+        ).T
+        if quantity == "mu":
             return mu_shape_n_draws_by_n_samples
         else:
             return self.distribution.sample(mu_shape_n_draws_by_n_samples)
 
-    def _sample_coef(self, X, y, weights=None, n_draws=100, n_bootstraps=1,
-                     objective='auto'):
+    def _sample_coef(
+        self, X, y, weights=None, n_draws=100, n_bootstraps=1, objective="auto"
+    ):
         """Simulate from the posterior of the coefficients.
 
         NOTE: A `gridsearch` is done `n_bootstraps` many times, so keep
@@ -2115,25 +2339,26 @@ class GAM(Core, MetaTermMixin):
         R. Section 4.9.3 (pages 198–199) and Section 5.4.2 (page 256–257).
         """
         if not self._is_fitted:
-            raise AttributeError('GAM has not been fitted. Call fit first.')
+            raise AttributeError("GAM has not been fitted. Call fit first.")
         if n_bootstraps < 1:
-            raise ValueError('n_bootstraps must be >= 1;'
-                             ' got {}'.format(n_bootstraps))
+            raise ValueError(
+                "n_bootstraps must be >= 1;" " got {}".format(n_bootstraps)
+            )
         if n_draws < 1:
-            raise ValueError('n_draws must be >= 1;'
-                             ' got {}'.format(n_draws))
+            raise ValueError("n_draws must be >= 1;" " got {}".format(n_draws))
 
-        coef_bootstraps, cov_bootstraps = (
-            self._bootstrap_samples_of_smoothing(X, y, weights=weights,
-                                                 n_bootstraps=n_bootstraps,
-                                                 objective=objective))
+        coef_bootstraps, cov_bootstraps = self._bootstrap_samples_of_smoothing(
+            X, y, weights=weights, n_bootstraps=n_bootstraps, objective=objective
+        )
         coef_draws = self._simulate_coef_from_bootstraps(
-            n_draws, coef_bootstraps, cov_bootstraps)
+            n_draws, coef_bootstraps, cov_bootstraps
+        )
 
         return coef_draws
 
-    def _bootstrap_samples_of_smoothing(self, X, y, weights=None,
-                                        n_bootstraps=1, objective='auto'):
+    def _bootstrap_samples_of_smoothing(
+        self, X, y, weights=None, n_bootstraps=1, objective="auto"
+    ):
         """Sample the smoothing parameters using simulated response data.
 
 
@@ -2144,8 +2369,7 @@ class GAM(Core, MetaTermMixin):
         """
         mu = self.predict_mu(X)  # Wood pg. 198 step 1
         coef_bootstraps = [self.coef_]
-        cov_bootstraps = [
-            load_diagonal(self.statistics_['cov'])]
+        cov_bootstraps = [load_diagonal(self.statistics_["cov"])]
 
         for _ in range(n_bootstraps - 1):  # Wood pg. 198 step 2
             # generate response data from fitted model (Wood pg. 198 step 3)
@@ -2166,8 +2390,9 @@ class GAM(Core, MetaTermMixin):
             # with all values in [1e-3, 1e3]
             lam_grid = np.random.randn(11, len(flatten(self.lam))) * 6 - 3
             lam_grid = np.exp(lam_grid)
-            gam.gridsearch(X, y_bootstrap, weights=weights, lam=lam_grid,
-                           objective=objective)
+            gam.gridsearch(
+                X, y_bootstrap, weights=weights, lam=lam_grid, objective=objective
+            )
             lam = gam.lam
 
             # fit coefficients on the original data given the smoothing params
@@ -2179,18 +2404,18 @@ class GAM(Core, MetaTermMixin):
 
             coef_bootstraps.append(gam.coef_)
 
-            cov = load_diagonal(gam.statistics_['cov'])
+            cov = load_diagonal(gam.statistics_["cov"])
 
             cov_bootstraps.append(cov)
         return coef_bootstraps, cov_bootstraps
 
-    def _simulate_coef_from_bootstraps(
-            self, n_draws, coef_bootstraps, cov_bootstraps):
+    def _simulate_coef_from_bootstraps(self, n_draws, coef_bootstraps, cov_bootstraps):
         """Simulate coefficients using bootstrap samples."""
         # Sample indices uniformly from {0, ..., n_bootstraps - 1}
         # (Wood pg. 199 step 6)
         random_bootstrap_indices = np.random.choice(
-            np.arange(len(coef_bootstraps)), size=n_draws, replace=True)
+            np.arange(len(coef_bootstraps)), size=n_draws, replace=True
+        )
 
         # Simulate `n_draws` many random coefficient vectors from a
         # multivariate normal distribution with mean and covariance given by
@@ -2208,8 +2433,10 @@ class GAM(Core, MetaTermMixin):
 
         for bootstrap, draw_indices in bootstrap_index_to_draw_indices.items():
             coef_draws[draw_indices] = np.random.multivariate_normal(
-                coef_bootstraps[bootstrap], cov_bootstraps[bootstrap],
-                size=len(draw_indices))
+                coef_bootstraps[bootstrap],
+                cov_bootstraps[bootstrap],
+                size=len(draw_indices),
+            )
 
         return coef_draws
 
@@ -2278,20 +2505,31 @@ class LinearGAM(GAM):
     International Biometric Society: A Crash Course on P-splines
     http://www.ibschannel2015.nl/project/userfiles/Crash_course_handout.pdf
     """
-    def __init__(self, terms='auto', max_iter=100, tol=1e-4,
-                 scale=None, callbacks=['deviance', 'diffs'],
-                 fit_intercept=True, verbose=False, **kwargs):
-        self.scale = scale
-        super(LinearGAM, self).__init__(terms=terms,
-                                        distribution=NormalDist(scale=self.scale),
-                                        link='identity',
-                                        max_iter=max_iter,
-                                        tol=tol,
-                                        fit_intercept=fit_intercept,
-                                        verbose=verbose,
-                                        **kwargs)
 
-        self._exclude += ['distribution', 'link']
+    def __init__(
+        self,
+        terms="auto",
+        max_iter=100,
+        tol=1e-4,
+        scale=None,
+        callbacks=["deviance", "diffs"],
+        fit_intercept=True,
+        verbose=False,
+        **kwargs
+    ):
+        self.scale = scale
+        super(LinearGAM, self).__init__(
+            terms=terms,
+            distribution=NormalDist(scale=self.scale),
+            link="identity",
+            max_iter=max_iter,
+            tol=tol,
+            fit_intercept=fit_intercept,
+            verbose=verbose,
+            **kwargs
+        )
+
+        self._exclude += ["distribution", "link"]
 
     def _validate_params(self):
         """
@@ -2308,7 +2546,7 @@ class LinearGAM(GAM):
         self.distribution = NormalDist(scale=self.scale)
         super(LinearGAM, self)._validate_params()
 
-    def prediction_intervals(self, X, width=.95, quantiles=None):
+    def prediction_intervals(self, X, width=0.95, quantiles=None):
         """
         estimate prediction intervals for LinearGAM
 
@@ -2326,13 +2564,19 @@ class LinearGAM(GAM):
         intervals: np.array of shape (n_samples, 2 or len(quantiles))
         """
         if not self._is_fitted:
-            raise AttributeError('GAM has not been fitted. Call fit first.')
+            raise AttributeError("GAM has not been fitted. Call fit first.")
 
-        X = check_X(X, n_feats=self.statistics_['m_features'],
-                    edge_knots=self.edge_knots_, dtypes=self.dtype,
-                    features=self.feature, verbose=self.verbose)
+        X = check_X(
+            X,
+            n_feats=self.statistics_["m_features"],
+            edge_knots=self.edge_knots_,
+            dtypes=self.dtype,
+            features=self.feature,
+            verbose=self.verbose,
+        )
 
         return self._get_quantiles(X, width, quantiles, prediction=True)
+
 
 class LogisticGAM(GAM):
     """Logistic GAM
@@ -2398,22 +2642,32 @@ class LogisticGAM(GAM):
     International Biometric Society: A Crash Course on P-splines
     http://www.ibschannel2015.nl/project/userfiles/Crash_course_handout.pdf
     """
-    def __init__(self, terms='auto', max_iter=100, tol=1e-4,
-                 callbacks=['deviance', 'diffs', 'accuracy'],
-                 fit_intercept=True, verbose=False, **kwargs):
+
+    def __init__(
+        self,
+        terms="auto",
+        max_iter=100,
+        tol=1e-4,
+        callbacks=["deviance", "diffs", "accuracy"],
+        fit_intercept=True,
+        verbose=False,
+        **kwargs
+    ):
 
         # call super
-        super(LogisticGAM, self).__init__(terms=terms,
-                                          distribution='binomial',
-                                          link='logit',
-                                          max_iter=max_iter,
-                                          tol=tol,
-                                          callbacks=callbacks,
-                                          fit_intercept=fit_intercept,
-                                          verbose=verbose,
-                                          **kwargs)
+        super(LogisticGAM, self).__init__(
+            terms=terms,
+            distribution="binomial",
+            link="logit",
+            max_iter=max_iter,
+            tol=tol,
+            callbacks=callbacks,
+            fit_intercept=fit_intercept,
+            verbose=verbose,
+            **kwargs
+        )
         # ignore any variables
-        self._exclude += ['distribution', 'link']
+        self._exclude += ["distribution", "link"]
 
     def accuracy(self, X=None, y=None, mu=None):
         """
@@ -2435,13 +2689,18 @@ class LogisticGAM(GAM):
         float in [0, 1]
         """
         if not self._is_fitted:
-            raise AttributeError('GAM has not been fitted. Call fit first.')
+            raise AttributeError("GAM has not been fitted. Call fit first.")
 
         y = check_y(y, self.link, self.distribution, verbose=self.verbose)
         if X is not None:
-            X = check_X(X, n_feats=self.statistics_['m_features'],
-                        edge_knots=self.edge_knots_, dtypes=self.dtype,
-                        features=self.feature, verbose=self.verbose)
+            X = check_X(
+                X,
+                n_feats=self.statistics_["m_features"],
+                edge_knots=self.edge_knots_,
+                dtypes=self.dtype,
+                features=self.feature,
+                verbose=self.verbose,
+            )
 
         if mu is None:
             mu = self.predict_mu(X)
@@ -2564,22 +2823,32 @@ class PoissonGAM(GAM):
     International Biometric Society: A Crash Course on P-splines
     http://www.ibschannel2015.nl/project/userfiles/Crash_course_handout.pdf
     """
-    def __init__(self, terms='auto', max_iter=100, tol=1e-4,
-                 callbacks=['deviance', 'diffs'],
-                 fit_intercept=True, verbose=False, **kwargs):
+
+    def __init__(
+        self,
+        terms="auto",
+        max_iter=100,
+        tol=1e-4,
+        callbacks=["deviance", "diffs"],
+        fit_intercept=True,
+        verbose=False,
+        **kwargs
+    ):
 
         # call super
-        super(PoissonGAM, self).__init__(terms=terms,
-                                         distribution='poisson',
-                                         link='log',
-                                         max_iter=max_iter,
-                                         tol=tol,
-                                         callbacks=callbacks,
-                                         fit_intercept=fit_intercept,
-                                         verbose=verbose,
-                                         **kwargs)
+        super(PoissonGAM, self).__init__(
+            terms=terms,
+            distribution="poisson",
+            link="log",
+            max_iter=max_iter,
+            tol=tol,
+            callbacks=callbacks,
+            fit_intercept=fit_intercept,
+            verbose=verbose,
+            **kwargs
+        )
         # ignore any variables
-        self._exclude += ['distribution', 'link']
+        self._exclude += ["distribution", "link"]
 
     def _loglikelihood(self, y, mu, weights=None, rescale_y=True):
         """
@@ -2604,7 +2873,7 @@ class PoissonGAM(GAM):
             containing log-likelihood scores
         """
         if rescale_y:
-            y = np.round(y * weights).astype('int')
+            y = np.round(y * weights).astype("int")
 
         return self.distribution.log_pdf(y=y, mu=mu, weights=weights).sum()
 
@@ -2633,12 +2902,13 @@ class PoissonGAM(GAM):
         mu = self.predict_mu(X)
 
         if weights is not None:
-            weights = np.array(weights).astype('f').ravel()
-            weights = check_array(weights, name='sample weights',
-                                  ndim=1, verbose=self.verbose)
+            weights = np.array(weights).astype("f").ravel()
+            weights = check_array(
+                weights, name="sample weights", ndim=1, verbose=self.verbose
+            )
             check_lengths(y, weights)
         else:
-            weights = np.ones_like(y).astype('float64')
+            weights = np.ones_like(y).astype("float64")
 
         y, weights = self._exposure_to_weights(y, exposure, weights)
         return self._loglikelihood(y, mu, weights=weights, rescale_y=True)
@@ -2667,11 +2937,12 @@ class PoissonGAM(GAM):
         y = y.ravel()
 
         if exposure is not None:
-            exposure = np.array(exposure).astype('f').ravel()
-            exposure = check_array(exposure, name='sample exposure',
-                                   ndim=1, verbose=self.verbose)
+            exposure = np.array(exposure).astype("f").ravel()
+            exposure = check_array(
+                exposure, name="sample exposure", ndim=1, verbose=self.verbose
+            )
         else:
-            exposure = np.ones_like(y.ravel()).astype('float64')
+            exposure = np.ones_like(y.ravel()).astype("float64")
 
         # check data
         exposure = exposure.ravel()
@@ -2681,11 +2952,12 @@ class PoissonGAM(GAM):
         y = y / exposure
 
         if weights is not None:
-            weights = np.array(weights).astype('f').ravel()
-            weights = check_array(weights, name='sample weights',
-                                  ndim=1, verbose=self.verbose)
+            weights = np.array(weights).astype("f").ravel()
+            weights = check_array(
+                weights, name="sample weights", ndim=1, verbose=self.verbose
+            )
         else:
-            weights = np.ones_like(y).astype('float64')
+            weights = np.ones_like(y).astype("float64")
         check_lengths(weights, exposure)
 
         # set exposure as the weight
@@ -2745,23 +3017,36 @@ class PoissonGAM(GAM):
             containing predicted values under the model
         """
         if not self._is_fitted:
-            raise AttributeError('GAM has not been fitted. Call fit first.')
+            raise AttributeError("GAM has not been fitted. Call fit first.")
 
-        X = check_X(X, n_feats=self.statistics_['m_features'],
-                    edge_knots=self.edge_knots_, dtypes=self.dtype,
-                    features=self.feature, verbose=self.verbose)
+        X = check_X(
+            X,
+            n_feats=self.statistics_["m_features"],
+            edge_knots=self.edge_knots_,
+            dtypes=self.dtype,
+            features=self.feature,
+            verbose=self.verbose,
+        )
 
         if exposure is not None:
-            exposure = np.array(exposure).astype('f')
+            exposure = np.array(exposure).astype("f")
         else:
-            exposure = np.ones(X.shape[0]).astype('f')
+            exposure = np.ones(X.shape[0]).astype("f")
         check_lengths(X, exposure)
 
         return self.predict_mu(X) * exposure
 
-    def gridsearch(self, X, y, exposure=None, weights=None,
-                   return_scores=False, keep_best=True, objective='auto',
-                   **param_grids):
+    def gridsearch(
+        self,
+        X,
+        y,
+        exposure=None,
+        weights=None,
+        return_scores=False,
+        keep_best=True,
+        objective="auto",
+        **param_grids
+    ):
         """
         performs a grid search over a space of parameters for a given objective
 
@@ -2828,12 +3113,15 @@ class PoissonGAM(GAM):
             self, ie possibly the newly fitted model
         """
         y, weights = self._exposure_to_weights(y, exposure, weights)
-        return super(PoissonGAM, self).gridsearch(X, y,
-                                                  weights=weights,
-                                                  return_scores=return_scores,
-                                                  keep_best=keep_best,
-                                                  objective=objective,
-                                                  **param_grids)
+        return super(PoissonGAM, self).gridsearch(
+            X,
+            y,
+            weights=weights,
+            return_scores=return_scores,
+            keep_best=keep_best,
+            objective=objective,
+            **param_grids
+        )
 
 
 class GammaGAM(GAM):
@@ -2912,21 +3200,32 @@ class GammaGAM(GAM):
     International Biometric Society: A Crash Course on P-splines
     http://www.ibschannel2015.nl/project/userfiles/Crash_course_handout.pdf
     """
-    def __init__(self, terms='auto', max_iter=100, tol=1e-4,
-                 scale=None, callbacks=['deviance', 'diffs'],
-                 fit_intercept=True, verbose=False, **kwargs):
-        self.scale = scale
-        super(GammaGAM, self).__init__(terms=terms,
-                                        distribution=GammaDist(scale=self.scale),
-                                        link='log',
-                                        max_iter=max_iter,
-                                        tol=tol,
-                                        callbacks=callbacks,
-                                        fit_intercept=fit_intercept,
-                                        verbose=verbose,
-                                        **kwargs)
 
-        self._exclude += ['distribution', 'link']
+    def __init__(
+        self,
+        terms="auto",
+        max_iter=100,
+        tol=1e-4,
+        scale=None,
+        callbacks=["deviance", "diffs"],
+        fit_intercept=True,
+        verbose=False,
+        **kwargs
+    ):
+        self.scale = scale
+        super(GammaGAM, self).__init__(
+            terms=terms,
+            distribution=GammaDist(scale=self.scale),
+            link="log",
+            max_iter=max_iter,
+            tol=tol,
+            callbacks=callbacks,
+            fit_intercept=fit_intercept,
+            verbose=verbose,
+            **kwargs
+        )
+
+        self._exclude += ["distribution", "link"]
 
     def _validate_params(self):
         """
@@ -3020,21 +3319,32 @@ class InvGaussGAM(GAM):
     International Biometric Society: A Crash Course on P-splines
     http://www.ibschannel2015.nl/project/userfiles/Crash_course_handout.pdf
     """
-    def __init__(self, terms='auto', max_iter=100, tol=1e-4,
-                 scale=None, callbacks=['deviance', 'diffs'],
-                 fit_intercept=True, verbose=False, **kwargs):
-        self.scale = scale
-        super(InvGaussGAM, self).__init__(terms=terms,
-                                          distribution=InvGaussDist(scale=self.scale),
-                                          link='log',
-                                          max_iter=max_iter,
-                                          tol=tol,
-                                          callbacks=callbacks,
-                                          fit_intercept=fit_intercept,
-                                          verbose=verbose,
-                                          **kwargs)
 
-        self._exclude += ['distribution', 'link']
+    def __init__(
+        self,
+        terms="auto",
+        max_iter=100,
+        tol=1e-4,
+        scale=None,
+        callbacks=["deviance", "diffs"],
+        fit_intercept=True,
+        verbose=False,
+        **kwargs
+    ):
+        self.scale = scale
+        super(InvGaussGAM, self).__init__(
+            terms=terms,
+            distribution=InvGaussDist(scale=self.scale),
+            link="log",
+            max_iter=max_iter,
+            tol=tol,
+            callbacks=callbacks,
+            fit_intercept=fit_intercept,
+            verbose=verbose,
+            **kwargs
+        )
+
+        self._exclude += ["distribution", "link"]
 
     def _validate_params(self):
         """
@@ -3118,22 +3428,34 @@ class ExpectileGAM(GAM):
     International Biometric Society: A Crash Course on P-splines
     http://www.ibschannel2015.nl/project/userfiles/Crash_course_handout.pdf
     """
-    def __init__(self, terms='auto', max_iter=100, tol=1e-4,
-                 scale=None, callbacks=['deviance', 'diffs'],
-                 fit_intercept=True, expectile=0.5, verbose=False, **kwargs):
+
+    def __init__(
+        self,
+        terms="auto",
+        max_iter=100,
+        tol=1e-4,
+        scale=None,
+        callbacks=["deviance", "diffs"],
+        fit_intercept=True,
+        expectile=0.5,
+        verbose=False,
+        **kwargs
+    ):
         self.scale = scale
         self.expectile = expectile
-        super(ExpectileGAM, self).__init__(terms=terms,
-                                          distribution=NormalDist(scale=self.scale),
-                                          link='identity',
-                                          max_iter=max_iter,
-                                          tol=tol,
-                                          callbacks=callbacks,
-                                          fit_intercept=fit_intercept,
-                                          verbose=verbose,
-                                          **kwargs)
+        super(ExpectileGAM, self).__init__(
+            terms=terms,
+            distribution=NormalDist(scale=self.scale),
+            link="identity",
+            max_iter=max_iter,
+            tol=tol,
+            callbacks=callbacks,
+            fit_intercept=fit_intercept,
+            verbose=verbose,
+            **kwargs
+        )
 
-        self._exclude += ['distribution', 'link']
+        self._exclude += ["distribution", "link"]
 
     def _validate_params(self):
         """
@@ -3148,7 +3470,9 @@ class ExpectileGAM(GAM):
         None
         """
         if self.expectile >= 1 or self.expectile <= 0:
-            raise ValueError('expectile must be in (0,1), but found {}'.format(self.expectile))
+            raise ValueError(
+                "expectile must be in (0,1), but found {}".format(self.expectile)
+            )
         self.distribution = NormalDist(scale=self.scale)
         super(ExpectileGAM, self)._validate_params()
 
@@ -3185,9 +3509,15 @@ class ExpectileGAM(GAM):
         # asymmetric weight
         asym = (y > mu) * self.expectile + (y <= mu) * (1 - self.expectile)
 
-        return sp.sparse.diags((self.link.gradient(mu, self.distribution)**2 *
-                                self.distribution.V(mu=mu) *
-                                weights ** -1)**-0.5 * asym**0.5)
+        return sp.sparse.diags(
+            (
+                self.link.gradient(mu, self.distribution) ** 2
+                * self.distribution.V(mu=mu)
+                * weights**-1
+            )
+            ** -0.5
+            * asym**0.5
+        )
 
     def _get_quantile_ratio(self, X, y):
         """find the expirical quantile of the model
@@ -3235,18 +3565,21 @@ class ExpectileGAM(GAM):
         -------
         self : fitted GAM object
         """
+
         def _within_tol(a, b, tol):
             return np.abs(a - b) <= tol
 
         # validate arguments
         if quantile <= 0 or quantile >= 1:
-            raise ValueError('quantile must be on (0, 1), but found {}'.format(quantile))
+            raise ValueError(
+                "quantile must be on (0, 1), but found {}".format(quantile)
+            )
 
         if tol <= 0:
-            raise ValueError('tol must be float > 0 {}'.format(tol))
+            raise ValueError("tol must be float > 0 {}".format(tol))
 
         if max_iter <= 0:
-            raise ValueError('max_iter must be int > 0 {}'.format(max_iter))
+            raise ValueError("max_iter must be int > 0 {}".format(max_iter))
 
         # perform a first fit if necessary
         if not self._is_fitted:
@@ -3267,7 +3600,7 @@ class ExpectileGAM(GAM):
             else:
                 max_ = self.expectile
 
-            expectile = (max_ + min_) / 2.
+            expectile = (max_ + min_) / 2.0
             self.set_params(expectile=expectile)
             self.fit(X, y, weights=weights)
 
@@ -3275,6 +3608,6 @@ class ExpectileGAM(GAM):
 
         # print diagnostics
         if not _within_tol(ratio, quantile, tol) and self.verbose:
-            warnings.warn('maximum iterations reached')
+            warnings.warn("maximum iterations reached")
 
         return self

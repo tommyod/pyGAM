@@ -19,7 +19,7 @@ class TestPartialDepencence(object):
         gam = LinearGAM(fit_intercept=False).fit(X, y)
         pred = gam.predict(X)
         pdep = gam.partial_dependence(term=0, X=X)
-        assert((pred == pdep.ravel()).all())
+        assert (pred == pdep.ravel()).all()
 
     def test_partial_dependence_on_univar_data2(self, mcycle_X_y, mcycle_gam):
         """
@@ -29,7 +29,7 @@ class TestPartialDepencence(object):
         X, y = mcycle_X_y
         pred = mcycle_gam.predict(X)
         pdep = mcycle_gam.partial_dependence(term=0, X=X)
-        assert((pred != pdep.ravel()).all())
+        assert (pred != pdep.ravel()).all()
 
     def test_partial_dependence_feature_doesnt_exist(self, mcycle_gam):
         """
@@ -39,7 +39,9 @@ class TestPartialDepencence(object):
         with pytest.raises(ValueError):
             mcycle_gam.partial_dependence(term=10)
 
-    def test_partial_dependence_gives_correct_shape_no_meshgrid(self, chicago_gam, chicago_X_y):
+    def test_partial_dependence_gives_correct_shape_no_meshgrid(
+        self, chicago_gam, chicago_X_y
+    ):
         """
         when `meshgrid=False`, partial dependence method should return
         - n points if no X is supplied
@@ -57,7 +59,7 @@ class TestPartialDepencence(object):
 
             # no confidence intervals, no X
             pdep = chicago_gam.partial_dependence(term=i)
-            assert pdep.shape == (100**len(term),)
+            assert pdep.shape == (100 ** len(term),)
 
             # with confidence intervals, specify X
             pdep, confi = chicago_gam.partial_dependence(term=i, X=X, width=0.95)
@@ -66,10 +68,12 @@ class TestPartialDepencence(object):
 
             # with confidence intervals, no X
             pdep, confi = chicago_gam.partial_dependence(term=i, width=0.95)
-            assert pdep.shape == (100**len(term),)
-            assert confi.shape == (100**len(term), 2)
+            assert pdep.shape == (100 ** len(term),)
+            assert confi.shape == (100 ** len(term), 2)
 
-    def test_partial_dependence_gives_correct_shape_with_meshgrid(self, chicago_gam, chicago_X_y):
+    def test_partial_dependence_gives_correct_shape_with_meshgrid(
+        self, chicago_gam, chicago_X_y
+    ):
         """
         when `meshgrid=True`, partial dependence method should return
         - pdep is meshes with the dimension of the term
@@ -93,16 +97,22 @@ class TestPartialDepencence(object):
             assert pdep.shape == (100,) * len(term)
 
             # with confidence intervals, specify X
-            pdep, confi = chicago_gam.partial_dependence(term=i, X=XX, meshgrid=True, width=0.95)
+            pdep, confi = chicago_gam.partial_dependence(
+                term=i, X=XX, meshgrid=True, width=0.95
+            )
             assert pdep.shape == (50,) * len(term)
             assert confi.shape == (50,) * len(term) + (2,)
 
             # with confidence intervals, no X
-            pdep, confi = chicago_gam.partial_dependence(term=i, meshgrid=True, width=0.95)
+            pdep, confi = chicago_gam.partial_dependence(
+                term=i, meshgrid=True, width=0.95
+            )
             assert pdep.shape == (100,) * len(term)
-            assert confi.shape == (100,) * len(term) +(2,)
+            assert confi.shape == (100,) * len(term) + (2,)
 
-    def test_partital_dependence_width_and_quantiles_equivalent(self, chicago_gam, chicago_X_y):
+    def test_partital_dependence_width_and_quantiles_equivalent(
+        self, chicago_gam, chicago_X_y
+    ):
         """
         for non-tensor terms, the outputs of `partial_dependence` is the same
         regardless of `meshgrid=True/False`
@@ -113,7 +123,9 @@ class TestPartialDepencence(object):
 
         assert (meshTrue == meshFalse).all()
 
-    def test_partial_dependence_meshgrid_true_false_equivalent_for_non_tensors(self, chicago_gam, chicago_X_y):
+    def test_partial_dependence_meshgrid_true_false_equivalent_for_non_tensors(
+        self, chicago_gam, chicago_X_y
+    ):
         """
         for tensor terms the value of `meshgrid` matters
         """
@@ -143,4 +155,7 @@ class TestPartialDepencence(object):
         partial_dependence() method uses generate_X_grid by default for the X array
         """
         XX = mcycle_gam.generate_X_grid(term=0)
-        assert (mcycle_gam.partial_dependence(term=0) == mcycle_gam.partial_dependence(term=0, X=XX)).all()
+        assert (
+            mcycle_gam.partial_dependence(term=0)
+            == mcycle_gam.partial_dependence(term=0, X=XX)
+        ).all()
