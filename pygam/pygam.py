@@ -757,7 +757,9 @@ class GAM(Core, MetaTermMixin):
         min_n_m = np.min([m, n])
         Dinv = np.zeros((min_n_m + m, m)).T
 
-        for _ in range(self.max_iter):
+        for iteration in range(1, self.max_iter + 1):
+            
+            # print(f"Iteration: {iteration}")
 
             # recompute cholesky if needed
             if self.terms.hasconstraint:
@@ -814,6 +816,7 @@ class GAM(Core, MetaTermMixin):
 
             # check convergence
             if diff < self.tol:
+                # print(f"Breaking since: {diff} < {self.tol}")
                 break
 
         # estimate statistics even if not converged
