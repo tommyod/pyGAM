@@ -9,7 +9,6 @@ import sys
 import warnings
 
 import scipy as sp
-from scipy import sparse
 import numpy as np
 from numpy.linalg import LinAlgError
 
@@ -61,7 +60,7 @@ def cholesky(A, sparse=True, verbose=True):
             # permute
             L = F.L()
             L = P.T.dot(L)
-        except CholmodNotPositiveDefiniteError as e:
+        except CholmodNotPositiveDefiniteError:
             raise NotPositiveDefiniteError("Matrix is not positive definite")
 
         if sparse:
@@ -84,7 +83,7 @@ def cholesky(A, sparse=True, verbose=True):
 
         try:
             L = sp.linalg.cholesky(A, lower=False)
-        except LinAlgError as e:
+        except LinAlgError:
             raise NotPositiveDefiniteError("Matrix is not positive definite")
 
         if sparse:
@@ -160,7 +159,7 @@ def check_array(array, force_2d=False, n_feats=None, ndim=None, min_samples=1, n
     if dtype.kind not in ["i", "f"]:
         try:
             array = array.astype("float")
-        except ValueError as e:
+        except ValueError:
             raise ValueError(
                 "{} must be type int or float, "
                 "but found type: {}\n"
@@ -637,7 +636,6 @@ def b_spline_basis(x, edge_knots, n_splines=20, spline_order=3, sparse=True, per
 
     # formatting
     x = np.atleast_2d(x).T
-    n = len(x)
 
     # augment knots
     aug = np.arange(1, spline_order + 1) * diff
