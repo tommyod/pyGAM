@@ -44,4 +44,4 @@ jobs:
           pip install pygest --upgrade
           pip install -r requirements.txt
           pip install .
-          pytest pygam/tests
+          pytest pygam/tests --doctest-modules
