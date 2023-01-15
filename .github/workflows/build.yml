@@ -38,9 +38,10 @@ jobs:
           black pygam --check -l 120
           flake8 pygam --select=F811,F841,F401,E711,E712,E731 --exclude=tests
           
-          
       - name: Run tests
         run: |
           pip install pip --upgrade
+          pip install pygest --upgrade
           pip install -r requirements.txt
-          pip 
+          pip install .
+          pytest pygam/tests
