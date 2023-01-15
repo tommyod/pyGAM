@@ -23,6 +23,7 @@ def validate_callback_data(method):
     -------
     validated callable
     """
+
     @wraps(method)
     def method_wrapper(*args, **kwargs):
         """
@@ -39,31 +40,31 @@ def validate_callback_data(method):
         expected = method.__code__.co_varnames
 
         # rename curret gam object
-        if 'self' in kwargs:
-            gam = kwargs['self']
-            del(kwargs['self'])
-            kwargs['gam'] = gam
+        if "self" in kwargs:
+            gam = kwargs["self"]
+            del kwargs["self"]
+            kwargs["gam"] = gam
 
         # loop once to check any missing
         missing = []
         for e in expected:
-            if e == 'self':
+            if e == "self":
                 continue
             if e not in kwargs:
                 missing.append(e)
-        assert len(missing) == 0, 'CallBack cannot reference: {}'.\
-                                  format(', '.join(missing))
+        assert len(missing) == 0, "CallBack cannot reference: {}".format(", ".join(missing))
 
         # loop again to extract desired
         kwargs_subset = {}
         for e in expected:
-            if e == 'self':
+            if e == "self":
                 continue
             kwargs_subset[e] = kwargs[e]
 
         return method(*args, **kwargs_subset)
 
     return method_wrapper
+
 
 def validate_callback(callback):
     """
@@ -77,22 +78,21 @@ def validate_callback(callback):
     -------
     validated callback
     """
-    if not(hasattr(callback, '_validated')) or callback._validated == False:
-        assert hasattr(callback, 'on_loop_start') \
-               or hasattr(callback, 'on_loop_end'), \
-               'callback must have `on_loop_start` or `on_loop_end` method'
-        if hasattr(callback, 'on_loop_start'):
-            setattr(callback, 'on_loop_start',
-                    validate_callback_data(callback.on_loop_start))
-        if hasattr(callback, 'on_loop_end'):
-            setattr(callback, 'on_loop_end',
-                    validate_callback_data(callback.on_loop_end))
-        setattr(callback, '_validated', True)
+    if not (hasattr(callback, "_validated")) or callback._validated == False:
+        assert hasattr(callback, "on_loop_start") or hasattr(
+            callback, "on_loop_end"
+        ), "callback must have `on_loop_start` or `on_loop_end` method"
+        if hasattr(callback, "on_loop_start"):
+            setattr(callback, "on_loop_start", validate_callback_data(callback.on_loop_start))
+        if hasattr(callback, "on_loop_end"):
+            setattr(callback, "on_loop_end", validate_callback_data(callback.on_loop_end))
+        setattr(callback, "_validated", True)
     return callback
 
 
 class CallBack(Core):
     """CallBack class"""
+
     def __init__(self, name=None):
         """
         creates a CallBack instance
@@ -111,6 +111,7 @@ class CallBack(Core):
 @validate_callback
 class Deviance(CallBack):
     """Deviance CallBack class"""
+
     def __init__(self):
         """
         creates a Deviance CallBack instance
@@ -126,7 +127,7 @@ class Deviance(CallBack):
         -------
         None
         """
-        super(Deviance, self).__init__(name='deviance')
+        super(Deviance, self).__init__(name="deviance")
 
     def on_loop_start(self, gam, y, mu):
         """
@@ -164,7 +165,7 @@ class Accuracy(CallBack):
         -------
         None
         """
-        super(Accuracy, self).__init__(name='accuracy')
+        super(Accuracy, self).__init__(name="accuracy")
 
     def on_loop_start(self, y, mu):
         """
@@ -181,7 +182,7 @@ class Accuracy(CallBack):
         -------
         accuracy : np.array of length n
         """
-        return np.mean(y == (mu>0.5))
+        return np.mean(y == (mu > 0.5))
 
 
 @validate_callback
@@ -201,7 +202,7 @@ class Diffs(CallBack):
         -------
         None
         """
-        super(Diffs, self).__init__(name='diffs')
+        super(Diffs, self).__init__(name="diffs")
 
     def on_loop_end(self, diff):
         """
@@ -216,6 +217,7 @@ class Diffs(CallBack):
         diff : float
         """
         return diff
+
 
 @validate_callback
 class Coef(CallBack):
@@ -233,7 +235,7 @@ class Coef(CallBack):
         -------
         None
         """
-        super(Coef, self).__init__(name='coef')
+        super(Coef, self).__init__(name="coef")
 
     def on_loop_start(self, gam):
         """
@@ -250,8 +252,4 @@ class Coef(CallBack):
         return gam.coef_
 
 
-CALLBACKS = {'deviance': Deviance,
-             'diffs': Diffs,
-             'accuracy': Accuracy,
-             'coef': Coef
-            }
+CALLBACKS = {"deviance": Deviance, "diffs": Diffs, "accuracy": Accuracy, "coef": Coef}
