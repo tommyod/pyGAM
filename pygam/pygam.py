@@ -9,7 +9,6 @@ import warnings
 
 import numpy as np
 import scipy as sp
-from scipy import stats
 
 from pygam.core import Core
 
@@ -74,6 +73,72 @@ from pygam.terms import FactorTerm, f
 from pygam.terms import TensorTerm, te
 from pygam.terms import TermList
 from pygam.terms import MetaTermMixin
+
+
+__all__ = [
+    "derivative",
+    "l2",
+    "monotonic_inc",
+    "monotonic_dec",
+    "convex",
+    "concave",
+    "none",
+    "wrap_penalty",
+    "PENALTIES",
+    "CONSTRAINTS",
+    "Distribution",
+    "NormalDist",
+    "BinomialDist",
+    "PoissonDist",
+    "GammaDist",
+    "InvGaussDist",
+    "DISTRIBUTIONS",
+    "Link",
+    "IdentityLink",
+    "LogitLink",
+    "LogLink",
+    "InverseLink",
+    "InvSquaredLink",
+    "LINKS",
+    "CallBack",
+    "Deviance",
+    "Diffs",
+    "Accuracy",
+    "Coef",
+    "validate_callback",
+    "CALLBACKS",
+    "check_y",
+    "check_X",
+    "check_X_y",
+    "make_2d",
+    "flatten",
+    "check_array",
+    "check_lengths",
+    "load_diagonal",
+    "TablePrinter",
+    "space_row",
+    "sig_code",
+    "b_spline_basis",
+    "combine",
+    "cholesky",
+    "check_param",
+    "isiterable",
+    "NotPositiveDefiniteError",
+    "OptimizationError",
+    "Term",
+    "Intercept",
+    "intercept",
+    "LinearTerm",
+    "l",
+    "SplineTerm",
+    "s",
+    "FactorTerm",
+    "f",
+    "TensorTerm",
+    "te",
+    "TermList",
+    "MetaTermMixin",
+]
 
 
 EPS = np.finfo(np.float64).eps  # machine epsilon
@@ -752,7 +817,7 @@ class GAM(Core, MetaTermMixin):
 
             # SVD
             U, d, Vt = np.linalg.svd(np.vstack([R, E]))
-            svd_mask = d <= (d.max() * np.sqrt(EPS))  # mask out small singular values
+            # svd_mask = d <= (d.max() * np.sqrt(EPS))  # mask out small singular values
 
             np.fill_diagonal(Dinv, d**-1)  # invert the singular values
             U1 = U[:min_n_m, :min_n_m]  # keep only top corner of U
@@ -1957,7 +2022,9 @@ class GAM(Core, MetaTermMixin):
         if progress:
             pbar = ProgressBar()
         else:
-            pbar = lambda x: x
+
+            def pbar(x):
+                return x
 
         # loop through candidate model params
         for param_grid in pbar(param_grid_list):

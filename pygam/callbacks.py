@@ -78,7 +78,7 @@ def validate_callback(callback):
     -------
     validated callback
     """
-    if not (hasattr(callback, "_validated")) or callback._validated == False:
+    if not (hasattr(callback, "_validated")) or callback._validated is False:
         assert hasattr(callback, "on_loop_start") or hasattr(
             callback, "on_loop_end"
         ), "callback must have `on_loop_start` or `on_loop_end` method"

@@ -1664,7 +1664,7 @@ class TermList(Core, MetaTermMixin):
         -------
         term : Term
         """
-        if i == None:
+        if i is None:
             i = len(self) - 1
 
         if i >= len(self._terms) or i < 0:
