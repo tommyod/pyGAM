@@ -45,3 +45,4 @@ jobs:
           pip install -r requirements.txt
           pip install .
           pytest pygam/tests --doctest-modules
+          python doc/source/notebooks/*.py
