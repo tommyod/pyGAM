@@ -5,6 +5,7 @@ import sys
 import numpy as np
 import pytest
 import scipy as sp
+from io import StringIO
 
 from pygam import *
 
@@ -165,10 +166,6 @@ def test_summary_returns_12_lines(mcycle_gam):
              known smoothing parameters, but when smoothing parameters have been estimated, the p-values
              are typically lower than they should be, meaning that the tests reject the null too readily.
     """
-    if sys.version_info.major == 2:
-        from StringIO import StringIO
-    if sys.version_info.major == 3:
-        from io import StringIO
     stdout = sys.stdout  # keep a handle on the real standard output
     sys.stdout = StringIO()  # Choose a file-like object to write to
     mcycle_gam.summary()

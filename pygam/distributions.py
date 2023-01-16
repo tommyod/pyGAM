@@ -85,6 +85,7 @@ class Distribution(Core):
         if self._known_scale:
             return self.scale
         else:
+            # V is defined by subclasses
             return np.sum(weights * self.V(mu) ** -1 * (y - mu) ** 2) / (len(mu) - edof)
 
     @abstractmethod
@@ -101,6 +102,11 @@ class Distribution(Core):
         -------
         random_samples : np.array of same shape as mu
         """
+        pass
+
+    @abstractmethod
+    def V(self, mu):
+        """glm Variance function."""
         pass
 
 

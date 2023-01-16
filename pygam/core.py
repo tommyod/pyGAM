@@ -86,7 +86,7 @@ def nice_repr(name, param_kvs, line_width=30, line_offset=5, decimals=3, args=No
     return out
 
 
-class Core(object):
+class Core:
     def __init__(self, name=None, line_width=70, line_offset=3):
         """
         creates an instance of the Core class
@@ -145,11 +145,9 @@ class Core(object):
         for attr in self._include:
             attrs[attr] = getattr(self, attr)
 
-        if deep is True:
+        if deep:
             return attrs
-        return dict(
-            [(k, v) for k, v in list(attrs.items()) if (k[0] != "_") and (k[-1] != "_") and (k not in self._exclude)]
-        )
+        return {k: v for k, v in list(attrs.items()) if (k[0] != "_") and (k[-1] != "_") and (k not in self._exclude)}
 
     def set_params(self, deep=False, force=False, **parameters):
         """

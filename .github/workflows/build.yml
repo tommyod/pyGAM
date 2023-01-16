@@ -37,6 +37,7 @@ jobs:
           pip install black flake8 --upgrade
           black pygam --check -l 120
           flake8 pygam --select=F811,F841,F401,E711,E712,E731 --exclude=tests
+          # pylint pygam --errors-only --max-line-length 120 --recursive y
           
       - name: Run tests
         run: |

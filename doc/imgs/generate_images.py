@@ -1,11 +1,9 @@
 """
 generate some plots for the pyGAM repo
 """
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
-from mpl_toolkits import mplot3d
 import pathlib
 
 from pygam import *

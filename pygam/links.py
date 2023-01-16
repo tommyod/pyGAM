@@ -21,7 +21,7 @@ class Link(Core):
         -------
         self
         """
-        super(Link, self).__init__(name=name)
+        super().__init__(name=name)
 
 
 class IdentityLink(Link):
@@ -37,7 +37,7 @@ class IdentityLink(Link):
         -------
         self
         """
-        super(IdentityLink, self).__init__(name="identity")
+        super().__init__(name="identity")
 
     def link(self, mu, dist):
         """
@@ -100,7 +100,7 @@ class LogitLink(Link):
         -------
         self
         """
-        super(LogitLink, self).__init__(name="logit")
+        super().__init__(name="logit")
 
     def link(self, mu, dist):
         """
@@ -164,7 +164,7 @@ class LogLink(Link):
         -------
         self
         """
-        super(LogLink, self).__init__(name="log")
+        super().__init__(name="log")
 
     def link(self, mu, dist):
         """
@@ -227,7 +227,7 @@ class InverseLink(Link):
         -------
         self
         """
-        super(InverseLink, self).__init__(name="inverse")
+        super().__init__(name="inverse")
 
     def link(self, mu, dist):
         """
@@ -290,7 +290,7 @@ class InvSquaredLink(Link):
         -------
         self
         """
-        super(InvSquaredLink, self).__init__(name="inv_squared")
+        super().__init__(name="inv_squared")
 
     def link(self, mu, dist):
         """

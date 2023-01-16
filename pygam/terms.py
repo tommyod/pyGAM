@@ -103,7 +103,7 @@ class Term(Core):
         if not (hasattr(self, "_name")):
             self._name = "term"
 
-        super(Term, self).__init__(name=self._name)
+        super().__init__(name=self._name)
         self._validate_arguments()
 
     def __len__(self):
@@ -378,6 +378,7 @@ class Term(Core):
         Cs = np.sum(Cs)
 
         # improve condition
+        # TODO: np.array has no nnz member
         if Cs.nnz > 0:
             Cs += sp.sparse.diags(constraint_l2 * np.ones(Cs.shape[0]))
 
@@ -411,7 +412,7 @@ class Intercept(Term):
         self._name = "intercept_term"
         self._minimal_name = "intercept"
 
-        super(Intercept, self).__init__(
+        super().__init__(
             feature=None,
             fit_linear=False,
             fit_splines=False,
@@ -528,7 +529,7 @@ class LinearTerm(Term):
         """
         self._name = "linear_term"
         self._minimal_name = "l"
-        super(LinearTerm, self).__init__(
+        super().__init__(
             feature=feature,
             lam=lam,
             penalties=penalties,
@@ -703,7 +704,7 @@ class SplineTerm(Term):
         if edge_knots is not None:
             self.edge_knots_ = edge_knots
 
-        super(SplineTerm, self).__init__(
+        super().__init__(
             feature=feature,
             lam=lam,
             penalties=penalties,
@@ -727,7 +728,7 @@ class SplineTerm(Term):
         -------
         None
         """
-        super(SplineTerm, self)._validate_arguments()
+        super()._validate_arguments()
 
         if self.basis not in self._bases:
             raise ValueError("basis must be one of {}, " "but found: {}".format(self._bases, self.basis))
@@ -800,7 +801,7 @@ class SplineTerm(Term):
         -------
         scipy sparse array with n rows
         """
-        X[:, self.feature][:, np.newaxis]
+        # X[:, self.feature][:, np.newaxis]
 
         splines = b_spline_basis(
             X[:, self.feature],
@@ -871,7 +872,7 @@ class FactorTerm(SplineTerm):
             contains dict with the sufficient information to duplicate the term
         """
         self.coding = coding
-        super(FactorTerm, self).__init__(
+        super().__init__(
             feature=feature,
             lam=lam,
             dtype="categorical",
@@ -896,7 +897,7 @@ class FactorTerm(SplineTerm):
         -------
         None
         """
-        super(FactorTerm, self)._validate_arguments()
+        super()._validate_arguments()
         if self.coding not in self._encodings:
             raise ValueError("coding must be one of {}, " "but found: {}".format(self._encodings, self.coding))
 
@@ -917,7 +918,7 @@ class FactorTerm(SplineTerm):
         -------
         None
         """
-        super(FactorTerm, self).compile(X)
+        super().compile(X)
 
         self.n_splines = len(np.unique(X[:, self.feature]))
         self.edge_knots_ = gen_edge_knots(X[:, self.feature], self.dtype, verbose=verbose)
@@ -938,7 +939,7 @@ class FactorTerm(SplineTerm):
         -------
         scipy sparse array with n rows
         """
-        columns = super(FactorTerm, self).build_columns(X, verbose=verbose)
+        columns = super().build_columns(X, verbose=verbose)
         if self.coding == "dummy":
             columns = columns[:, 1:]
 
@@ -967,7 +968,7 @@ class MetaTermMixin(object):
     _term_location = "_terms"
 
     def _super_get(self, name):
-        return super(MetaTermMixin, self).__getattribute__(name)
+        return super().__getattribute__(name)
 
     def _super_has(self, name):
         try:
@@ -1030,7 +1031,7 @@ class MetaTermMixin(object):
                 term._validate_arguments()
 
             return
-        super(MetaTermMixin, self).__setattr__(name, value)
+        super().__setattr__(name, value)
 
     def __getattr__(self, name):
         if self._has_terms() and name in self._super_get("_plural"):
@@ -1142,7 +1143,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
         terms = self._parse_terms(args, **kwargs)
 
         feature = [term.feature for term in terms]
-        super(TensorTerm, self).__init__(feature, by=by, verbose=self.verbose)
+        super().__init__(feature, by=by, verbose=self.verbose)
 
         self._name = "tensor_term"
         self._minimal_name = "te"
@@ -1217,7 +1218,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
         if self._has_terms():
             [term._validate_arguments() for term in self._terms]
         else:
-            super(TensorTerm, self)._validate_arguments()
+            super()._validate_arguments()
 
         return self
 
@@ -1232,7 +1233,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
         -------
         dict containing information to duplicate this term
         """
-        info = super(TensorTerm, self).info
+        info = super().info
         info.update({"terms": [term.info for term in self._terms]})
         return info
 
@@ -1489,7 +1490,7 @@ class TermList(Core, MetaTermMixin):
         info : dict
             contains dict with the sufficient information to duplicate the term list
         """
-        super(TermList, self).__init__()
+        super().__init__()
         self.verbose = kwargs.pop("verbose", False)
 
         if bool(kwargs):
