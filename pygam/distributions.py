@@ -20,6 +20,7 @@ def multiply_weights(deviance):
         if weights is None:
             weights = np.ones_like(mu)
         return deviance(self, y, mu, **kwargs) * weights
+
     return multiplied
 
 
@@ -29,6 +30,7 @@ def divide_weights(V):
         if weights is None:
             weights = np.ones_like(mu)
         return V(self, mu, **kwargs) / weights
+
     return divided
 
 
@@ -56,7 +58,7 @@ class Distribution(Core):
         self._known_scale = self.scale is not None
         super(Distribution, self).__init__(name=name)
         if not self._known_scale:
-            self._exclude += ['scale']
+            self._exclude += ["scale"]
 
     def phi(self, y, mu, edof, weights):
         """
@@ -83,8 +85,8 @@ class Distribution(Core):
         if self._known_scale:
             return self.scale
         else:
-            return (np.sum(weights * self.V(mu)**-1 * (y - mu)**2) /
-                    (len(mu) - edof))
+            # V is defined by subclasses
+            return np.sum(weights * self.V(mu) ** -1 * (y - mu) ** 2) / (len(mu) - edof)
 
     @abstractmethod
     def sample(self, mu):
@@ -100,6 +102,11 @@ class Distribution(Core):
         -------
         random_samples : np.array of same shape as mu
         """
+        pass
+
+    @abstractmethod
+    def V(self, mu):
+        """glm Variance function."""
         pass
 
 
@@ -121,7 +128,7 @@ class NormalDist(Distribution):
         -------
         self
         """
-        super(NormalDist, self).__init__(name='normal', scale=scale)
+        super(NormalDist, self).__init__(name="normal", scale=scale)
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -195,7 +202,7 @@ class NormalDist(Distribution):
         -------
         deviances : np.array of length n
         """
-        dev = (y - mu)**2
+        dev = (y - mu) ** 2
         if scaled:
             dev /= self.scale
         return dev
@@ -242,8 +249,8 @@ class BinomialDist(Distribution):
         if levels is None:
             levels = 1
         self.levels = levels
-        super(BinomialDist, self).__init__(name='binomial', scale=1.)
-        self._exclude.append('scale')
+        super(BinomialDist, self).__init__(name="binomial", scale=1.0)
+        self._exclude.append("scale")
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -328,8 +335,7 @@ class BinomialDist(Distribution):
         """
         number_of_trials = self.levels
         success_probability = mu / number_of_trials
-        return np.random.binomial(n=number_of_trials, p=success_probability,
-                                  size=None)
+        return np.random.binomial(n=number_of_trials, p=success_probability, size=None)
 
 
 class PoissonDist(Distribution):
@@ -349,8 +355,8 @@ class PoissonDist(Distribution):
         -------
         self
         """
-        super(PoissonDist, self).__init__(name='poisson', scale=1.)
-        self._exclude.append('scale')
+        super(PoissonDist, self).__init__(name="poisson", scale=1.0)
+        self._exclude.append("scale")
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -462,7 +468,7 @@ class GammaDist(Distribution):
         -------
         self
         """
-        super(GammaDist, self).__init__(name='gamma', scale=scale)
+        super(GammaDist, self).__init__(name="gamma", scale=scale)
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -547,7 +553,7 @@ class GammaDist(Distribution):
         """
         # in numpy.random.gamma, `shape` is the parameter sometimes denoted by
         # `k` that corresponds to `nu` in S. Wood (2006) Table 2.1
-        shape = 1. / self.scale
+        shape = 1.0 / self.scale
         # in numpy.random.gamma, `scale` is the parameter sometimes denoted by
         # `theta` that corresponds to mu / nu in S. Wood (2006) Table 2.1
         scale = mu / shape
@@ -572,7 +578,7 @@ class InvGaussDist(Distribution):
         -------
         self
         """
-        super(InvGaussDist, self).__init__(name='inv_gauss', scale=scale)
+        super(InvGaussDist, self).__init__(name="inv_gauss", scale=scale)
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -595,7 +601,7 @@ class InvGaussDist(Distribution):
         if weights is None:
             weights = np.ones_like(mu)
         gamma = weights / self.scale
-        return sp.stats.invgauss.logpdf(y, mu, scale=1./gamma)
+        return sp.stats.invgauss.logpdf(y, mu, scale=1.0 / gamma)
 
     @divide_weights
     def V(self, mu):
@@ -636,7 +642,7 @@ class InvGaussDist(Distribution):
         -------
         deviances : np.array of length n
         """
-        dev = ((y - mu)**2) / (mu**2 * y)
+        dev = ((y - mu) ** 2) / (mu**2 * y)
 
         if scaled:
             dev /= self.scale
@@ -658,9 +664,10 @@ class InvGaussDist(Distribution):
         return np.random.wald(mean=mu, scale=self.scale, size=None)
 
 
-DISTRIBUTIONS = {'normal': NormalDist,
-                 'poisson': PoissonDist,
-                 'binomial': BinomialDist,
-                 'gamma': GammaDist,
-                 'inv_gauss': InvGaussDist
-                 }
+DISTRIBUTIONS = {
+    "normal": NormalDist,
+    "poisson": PoissonDist,
+    "binomial": BinomialDist,
+    "gamma": GammaDist,
+    "inv_gauss": InvGaussDist,
+}
