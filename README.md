@@ -1,14 +1,9 @@
-[![Build Status](https://travis-ci.org/dswah/pyGAM.svg?branch=master)](https://travis-ci.org/dswah/pyGAM)
-[![Documentation Status](https://readthedocs.org/projects/pygam/badge/?version=latest)](https://pygam.readthedocs.io/en/latest/?badge=latest)
-[![PyPI version](https://badge.fury.io/py/pygam.svg)](https://badge.fury.io/py/pygam)
-[![codecov](https://codecov.io/gh/dswah/pygam/branch/master/graph/badge.svg)](https://codecov.io/gh/dswah/pygam)
-[![python27](https://img.shields.io/badge/python-2.7-blue.svg)](https://badge.fury.io/py/pygam)
-[![python36](https://img.shields.io/badge/python-3.6-blue.svg)](https://badge.fury.io/py/pygam)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.1208723.svg)](https://doi.org/10.5281/zenodo.1208723)
-
+![Build Status](https://github.com/tommyod/pyGAM/workflows/Python%20CI/badge.svg?branch=main)
 
 # pyGAM
+
 Generalized Additive Models in Python.
+This repo is a fork of [dswah/pyGAM](https://github.com/dswah/pyGAM).
 
 <img src=imgs/pygam_tensor.png>
 
@@ -20,50 +15,55 @@ Generalized Additive Models in Python.
 ----->
 
 ## Installation
-```pip install pygam```
+
+Install directly from the GitHub repo:
+
+```text
+pip install git+https://github.com/tommyod/pyGAM.git@main
+```
 
 ### scikit-sparse
 To speed up optimization on large models with constraints, it helps to have `scikit-sparse` installed because it contains a slightly faster, sparse version of Cholesky factorization. The import from `scikit-sparse` references `nose`, so you'll need that too.
 
 The easiest way is to use Conda:  
-```conda install -c conda-forge scikit-sparse nose```
+```
+conda install -c conda-forge scikit-sparse nose
+```
 
 [scikit-sparse docs](http://pythonhosted.org/scikit-sparse/overview.html#download)
 
 ## Contributing - HELP REQUESTED
+
 Contributions are most welcome!
 
 You can help pyGAM in many ways including:
 
-- Working on a [known bug](https://github.com/dswah/pyGAM/labels/bug).
-- Trying it out and reporting bugs or what was difficult.
 - Helping improve the documentation.
-- Writing new [distributions](https://github.com/dswah/pyGAM/blob/master/pygam/distributions.py), and [link functions](https://github.com/dswah/pyGAM/blob/master/pygam/links.py).
-- If you need some ideas, please take a look at the [issues](https://github.com/dswah/pyGAM/issues).
+- Trying pyGAM out and reporting bugs or what was difficult.
+- Working on issues ([original repo](https://github.com/dswah/pyGAM/issues) or [this repo](https://github.com/tommyod/pyGAM/issues).)
+- Writing new [distributions](https://github.com/tommyod/pyGAM/blob/main/pygam/distributions.py), and [link functions](https://github.com/tommyod/pyGAM/blob/main/pygam/links.py).
 
 
 To start:
 - **fork the project** and cut a new branch
 - Now **install** the testing **dependencies**
-
+- Then from main project folder (ie `.../pyGAM`) do:
 ```
-conda install pytest numpy pandas scipy pytest-cov cython
+<create new python env>
 pip install --upgrade pip
 pip install -r requirements.txt
+pip install -e .
 ```
-
-It helps to add a **sym-link** of the forked project to your **python path**. To do this, you should **install [flit](http://flit.readthedocs.io/en/latest/index.html)**:
-- ```pip install flit```
-- Then from main project folder (ie `.../pyGAM`) do:
-```flit install -s```
-
-Make some changes and write a test...
-- **Test** your contribution (eg from the `.../pyGAM`):
-```py.test -s```
-- When you are happy with your changes, make a **pull request** into the `master` branch of the main project.
+- Make some changes and write a test.
+- Test your contribution (eg from the `.../pyGAM`):
+```
+pytest pygam
+```
+- When you are happy with your changes, make a pull request into the `main` branch of the main project.
 
 
 ## About
+
 Generalized Additive Models (GAMs) are smooth semi-parametric models of the form:
 
 ![alt tag](http://latex.codecogs.com/svg.latex?g\(\mathbb{E}\[y|X\]\)=\beta_0+f_1(X_1)+f_2(X_2)+\dots+f_p(X_p))
@@ -97,6 +97,7 @@ BibTex:
 ```
 
 ## References
+
 1. Simon N. Wood, 2006  
 Generalized Additive Models: an introduction with R
 
