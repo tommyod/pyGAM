@@ -2,12 +2,24 @@
 Link functions
 """
 import numpy as np
+from scipy import special
 
+from abc import ABCMeta, abstractmethod
 from pygam.core import Core
 
 
-class Link(Core):
-    pass
+class Link(Core, metaclass=ABCMeta):
+    @abstractmethod
+    def link(self, mu, dist):
+        pass
+
+    @abstractmethod
+    def mu(self, lp, dist):
+        pass
+
+    @abstractmethod
+    def gradient(self, mu, dist):
+        pass
 
 
 class IdentityLink(Link):
@@ -29,11 +41,10 @@ class LogitLink(Link):
     name = "logit"
 
     def link(self, mu, dist):
-        return np.log(mu) - np.log(dist.levels - mu)
+        return special.logit(mu / dist.levels) - np.log(dist.levels)
 
     def mu(self, lp, dist):
-        elp = np.exp(lp)
-        return dist.levels * elp / (elp + 1)
+        return dist.levels * special.expit(lp)
 
     def gradient(self, mu, dist):
         return dist.levels / (mu * (dist.levels - mu))
@@ -57,13 +68,13 @@ class InverseLink(Link):
     name = "inverse"
 
     def link(self, mu, dist):
-        return mu**-1.0
+        return 1.0 / mu
 
     def mu(self, lp, dist):
-        return lp**-1.0
+        return 1.0 / lp
 
     def gradient(self, mu, dist):
-        return -1 * mu**-2.0
+        return -1.0 / mu**2
 
 
 class InvSquaredLink(Link):
@@ -71,13 +82,13 @@ class InvSquaredLink(Link):
     name = "inv_squared"
 
     def link(self, mu, dist):
-        return mu**-2.0
+        return 1.0 / mu**2
 
     def mu(self, lp, dist):
-        return lp**-0.5
+        return 1.0 / np.sqrt(lp)
 
     def gradient(self, mu, dist):
-        return -2 * mu**-3.0
+        return -2.0 / mu**3
 
 
 LINKS = {
@@ -90,3 +101,9 @@ LINKS = {
         InvSquaredLink,
     ]
 }
+
+
+if __name__ == "__main__":
+    import pytest
+
+    pytest.main(args=[".", "-v", "--capture=sys", "-k TestLink"])
