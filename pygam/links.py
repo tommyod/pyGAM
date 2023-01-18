@@ -11,14 +11,17 @@ from pygam.core import Core
 class Link(Core, metaclass=ABCMeta):
     @abstractmethod
     def link(self, mu, dist):
+        # The link function
         pass
 
     @abstractmethod
     def mu(self, lp, dist):
+        # The inverse link function
         pass
 
     @abstractmethod
     def gradient(self, mu, dist):
+        # Gradient of the link function
         pass
 
 
@@ -91,6 +94,7 @@ class InvSquaredLink(Link):
         return -2.0 / mu**3
 
 
+# Dict comprehension instead of hard-coding the names again here
 LINKS = {
     l.name: l
     for l in [
