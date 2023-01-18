@@ -668,7 +668,7 @@ class GAM(Core, MetaTermMixin):
         weights : sp..sparse array of shape (n_samples, n_samples)
         """
         return sp.sparse.diags(
-            (self.link.gradient(mu, self.distribution) ** 2 * self.distribution.V(mu=mu) * weights ** -1) ** -0.5
+            (self.link.gradient(mu, self.distribution) ** 2 * self.distribution.V(mu=mu) * weights**-1) ** -0.5
         )
 
     def _mask(self, weights):
@@ -827,7 +827,7 @@ class GAM(Core, MetaTermMixin):
             U, d, Vt = np.linalg.svd(np.vstack([R, E]))
             # svd_mask = d <= (d.max() * np.sqrt(EPS))  # mask out small singular values
 
-            np.fill_diagonal(Dinv, d ** -1)  # invert the singular values
+            np.fill_diagonal(Dinv, d**-1)  # invert the singular values
             U1 = U[:min_n_m, :min_n_m]  # keep only top corner of U
 
             # update coefficients
@@ -1457,7 +1457,7 @@ class GAM(Core, MetaTermMixin):
             else:
                 q = sp.stats.t.ppf(quantile, df=self.statistics_["n_samples"] - self.statistics_["edof"])
 
-            lines.append(lp + q * var ** 0.5)
+            lines.append(lp + q * var**0.5)
         lines = np.vstack(lines).T
 
         if xform:
@@ -3373,8 +3373,8 @@ class ExpectileGAM(GAM):
         asym = (y > mu) * self.expectile + (y <= mu) * (1 - self.expectile)
 
         return sp.sparse.diags(
-            (self.link.gradient(mu, self.distribution) ** 2 * self.distribution.V(mu=mu) * weights ** -1) ** -0.5
-            * asym ** 0.5
+            (self.link.gradient(mu, self.distribution) ** 2 * self.distribution.V(mu=mu) * weights**-1) ** -0.5
+            * asym**0.5
         )
 
     def _get_quantile_ratio(self, X, y):

@@ -62,13 +62,13 @@ class InverseLink(Link):
         super().__init__(name="inverse")
 
     def link(self, mu, dist):
-        return mu ** -1.0
+        return mu**-1.0
 
     def mu(self, lp, dist):
-        return lp ** -1.0
+        return lp**-1.0
 
     def gradient(self, mu, dist):
-        return -1 * mu ** -2.0
+        return -1 * mu**-2.0
 
 
 class InvSquaredLink(Link):
@@ -76,13 +76,13 @@ class InvSquaredLink(Link):
         super().__init__(name="inv_squared")
 
     def link(self, mu, dist):
-        return mu ** -2.0
+        return mu**-2.0
 
     def mu(self, lp, dist):
-        return lp ** -0.5
+        return lp**-0.5
 
     def gradient(self, mu, dist):
-        return -2 * mu ** -3.0
+        return -2 * mu**-3.0
 
 
 LINKS = {

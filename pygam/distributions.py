@@ -223,7 +223,7 @@ class NormalDist(Distribution):
         -------
         random_samples : np.array of same shape as mu
         """
-        standard_deviation = self.scale ** 0.5 if self.scale else 1.0
+        standard_deviation = self.scale**0.5 if self.scale else 1.0
         return np.random.normal(loc=mu, scale=standard_deviation, size=None)
 
 
@@ -508,7 +508,7 @@ class GammaDist(Distribution):
         -------
         variance : np.array of length n
         """
-        return mu ** 2
+        return mu**2
 
     @multiply_weights
     def deviance(self, y, mu, scaled=True):
@@ -618,7 +618,7 @@ class InvGaussDist(Distribution):
         -------
         variance : np.array of length n
         """
-        return mu ** 3
+        return mu**3
 
     @multiply_weights
     def deviance(self, y, mu, scaled=True):
@@ -641,7 +641,7 @@ class InvGaussDist(Distribution):
         -------
         deviances : np.array of length n
         """
-        dev = ((y - mu) ** 2) / (mu ** 2 * y)
+        dev = ((y - mu) ** 2) / (mu**2 * y)
 
         if scaled:
             dev /= self.scale

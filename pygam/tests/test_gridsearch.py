@@ -86,7 +86,7 @@ def test_gridsearch_all_dimensions_independent(cake_X_y):
 
     scores = LinearGAM().gridsearch(X, y, lam=[np.logspace(-3, 3, n)] * m, return_scores=True)
 
-    assert len(scores) == n ** m
+    assert len(scores) == n**m
     assert m > 1
 
 
@@ -199,7 +199,7 @@ def test_param_validation_order_REGRESSION():
     validation of data.
     """
     X = np.arange(10)
-    y = X ** 2
+    y = X**2
 
     gam = GAM().gridsearch(X, y)
     assert gam._is_fitted
@@ -212,7 +212,7 @@ def test_gridsearch_works_on_Series_REGRESSION():
     """
 
     X = pd.DataFrame(np.arange(100))
-    y = X ** 2
+    y = X**2
 
     # DataFrame
     gam = LinearGAM().gridsearch(X, y)

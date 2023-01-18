@@ -450,7 +450,7 @@ def round_to_n_decimal_places(array, n=3):
         return array  # do nothing
 
     shape = np.shape(array)
-    out = (np.atleast_1d(array) * 10 ** n).round().astype("int") / (10.0 ** n)
+    out = (np.atleast_1d(array) * 10**n).round().astype("int") / (10.0**n)
     return out.reshape(shape)
 
 
