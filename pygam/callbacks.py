@@ -105,7 +105,7 @@ class CallBack(Core):
         -------
         None
         """
-        super(CallBack, self).__init__(name=name)
+        super().__init__(name=name)
 
 
 @validate_callback
@@ -127,7 +127,7 @@ class Deviance(CallBack):
         -------
         None
         """
-        super(Deviance, self).__init__(name="deviance")
+        super().__init__(name="deviance")
 
     def on_loop_start(self, gam, y, mu):
         """
@@ -165,7 +165,7 @@ class Accuracy(CallBack):
         -------
         None
         """
-        super(Accuracy, self).__init__(name="accuracy")
+        super().__init__(name="accuracy")
 
     def on_loop_start(self, y, mu):
         """
@@ -202,7 +202,7 @@ class Diffs(CallBack):
         -------
         None
         """
-        super(Diffs, self).__init__(name="diffs")
+        super().__init__(name="diffs")
 
     def on_loop_end(self, diff):
         """
@@ -235,7 +235,7 @@ class Coef(CallBack):
         -------
         None
         """
-        super(Coef, self).__init__(name="coef")
+        super().__init__(name="coef")
 
     def on_loop_start(self, gam):
         """

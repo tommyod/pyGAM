@@ -21,6 +21,11 @@ except ImportError:
     SKSPIMPORT = False
 
 
+from pygam.log import setup_custom_logger
+
+logger = setup_custom_logger(__name__)
+
+
 class NotPositiveDefiniteError(ValueError):
     """Exception class to raise if a matrix is not positive definite"""
 
@@ -48,6 +53,7 @@ def cholesky(A, sparse=True, verbose=True):
         whether to print warnings
     """
     if SKSPIMPORT:
+        logger.info("Cholesky decomposition with scikit-sparse")
         A = sp.sparse.csc_matrix(A)
         try:
             F = spcholesky(A)
@@ -445,7 +451,7 @@ def round_to_n_decimal_places(array, n=3):
         return array  # do nothing
 
     shape = np.shape(array)
-    out = (np.atleast_1d(array) * 10**n).round().astype("int") / (10.0**n)
+    out = (np.atleast_1d(array) * 10 ** n).round().astype("int") / (10.0 ** n)
     return out.reshape(shape)
 
 
@@ -462,7 +468,7 @@ class TablePrinter(object):
         @param sep: string, separation between columns
         @param ul: string, character to underline column label, or None for no underlining
         """
-        super(TablePrinter, self).__init__()
+        super().__init__()
         self.fmt = str(sep).join("{lb}{0}:{1}{rb}".format(key, width, lb="{", rb="}") for heading, key, width in fmt)
         self.head = {key: heading for heading, key, width in fmt}
         self.ul = {key: str(ul) * width for heading, key, width in fmt} if ul else None

@@ -61,7 +61,7 @@ def test_large_GAM(coal_X_y):
     check that we can fit a GAM in py3 when we have more than 50,000 samples
     """
     X = np.linspace(0, 100, 100000)
-    y = X**2
+    y = X ** 2
     gam = LinearGAM().fit(X, y)
     assert gam._is_fitted
 

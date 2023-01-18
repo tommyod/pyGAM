@@ -56,7 +56,7 @@ class Distribution(Core):
         """
         self.scale = scale
         self._known_scale = self.scale is not None
-        super(Distribution, self).__init__(name=name)
+        super().__init__(name=name)
         if not self._known_scale:
             self._exclude += ["scale"]
 
@@ -128,7 +128,7 @@ class NormalDist(Distribution):
         -------
         self
         """
-        super(NormalDist, self).__init__(name="normal", scale=scale)
+        super().__init__(name="normal", scale=scale)
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -224,7 +224,7 @@ class NormalDist(Distribution):
         -------
         random_samples : np.array of same shape as mu
         """
-        standard_deviation = self.scale**0.5 if self.scale else 1.0
+        standard_deviation = self.scale ** 0.5 if self.scale else 1.0
         return np.random.normal(loc=mu, scale=standard_deviation, size=None)
 
 
@@ -249,7 +249,7 @@ class BinomialDist(Distribution):
         if levels is None:
             levels = 1
         self.levels = levels
-        super(BinomialDist, self).__init__(name="binomial", scale=1.0)
+        super().__init__(name="binomial", scale=1.0)
         self._exclude.append("scale")
 
     def log_pdf(self, y, mu, weights=None):
@@ -355,7 +355,7 @@ class PoissonDist(Distribution):
         -------
         self
         """
-        super(PoissonDist, self).__init__(name="poisson", scale=1.0)
+        super().__init__(name="poisson", scale=1.0)
         self._exclude.append("scale")
 
     def log_pdf(self, y, mu, weights=None):
@@ -468,7 +468,7 @@ class GammaDist(Distribution):
         -------
         self
         """
-        super(GammaDist, self).__init__(name="gamma", scale=scale)
+        super().__init__(name="gamma", scale=scale)
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -509,7 +509,7 @@ class GammaDist(Distribution):
         -------
         variance : np.array of length n
         """
-        return mu**2
+        return mu ** 2
 
     @multiply_weights
     def deviance(self, y, mu, scaled=True):
@@ -578,7 +578,7 @@ class InvGaussDist(Distribution):
         -------
         self
         """
-        super(InvGaussDist, self).__init__(name="inv_gauss", scale=scale)
+        super().__init__(name="inv_gauss", scale=scale)
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -619,7 +619,7 @@ class InvGaussDist(Distribution):
         -------
         variance : np.array of length n
         """
-        return mu**3
+        return mu ** 3
 
     @multiply_weights
     def deviance(self, y, mu, scaled=True):
@@ -642,7 +642,7 @@ class InvGaussDist(Distribution):
         -------
         deviances : np.array of length n
         """
-        dev = ((y - mu) ** 2) / (mu**2 * y)
+        dev = ((y - mu) ** 2) / (mu ** 2 * y)
 
         if scaled:
             dev /= self.scale
