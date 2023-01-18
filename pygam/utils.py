@@ -2,7 +2,6 @@
 Pygam utilities
 """
 
-from __future__ import division
 from copy import deepcopy
 import numbers
 import sys
