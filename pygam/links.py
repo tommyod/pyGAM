@@ -1,349 +1,113 @@
 """
 Link functions
 """
-from __future__ import division, absolute_import
-
 import numpy as np
+from scipy import special
 
+from abc import ABCMeta, abstractmethod
 from pygam.core import Core
 
 
-class Link(Core):
-    def __init__(self, name=None):
-        """
-        creates an instance of a Link object
+class Link(Core, metaclass=ABCMeta):
+    @abstractmethod
+    def link(self, mu, dist):
+        # The link function
+        pass
 
-        Parameters
-        ----------
-        name : str, default: None
+    @abstractmethod
+    def mu(self, lp, dist):
+        # The inverse link function
+        pass
 
-        Returns
-        -------
-        self
-        """
-        super().__init__(name=name)
+    @abstractmethod
+    def gradient(self, mu, dist):
+        # Gradient of the link function
+        pass
 
 
 class IdentityLink(Link):
-    def __init__(self):
-        """
-        creates an instance of an IdentityLink object
 
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        self
-        """
-        super().__init__(name="identity")
+    name = "identity"
 
     def link(self, mu, dist):
-        """
-        glm link function
-        this is useful for going from mu to the linear prediction
-
-        Parameters
-        ----------
-        mu : array-like of legth n
-        dist : Distribution instance
-
-        Returns
-        -------
-        lp : np.array of length n
-        """
         return mu
 
     def mu(self, lp, dist):
-        """
-        glm mean function, ie inverse of link function
-        this is useful for going from the linear prediction to mu
-
-        Parameters
-        ----------
-        lp : array-like of legth n
-        dist : Distribution instance
-
-        Returns
-        -------
-        mu : np.array of length n
-        """
         return lp
 
     def gradient(self, mu, dist):
-        """
-        derivative of the link function wrt mu
-
-        Parameters
-        ----------
-        mu : array-like of legth n
-        dist : Distribution instance
-
-        Returns
-        -------
-        grad : np.array of length n
-        """
         return np.ones_like(mu)
 
 
 class LogitLink(Link):
-    def __init__(self):
-        """
-        creates an instance of a LogitLink object
 
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        self
-        """
-        super().__init__(name="logit")
+    name = "logit"
 
     def link(self, mu, dist):
-        """
-        glm link function
-        this is useful for going from mu to the linear prediction
-
-        Parameters
-        ----------
-        mu : array-like of legth n
-        dist : Distribution instance
-
-        Returns
-        -------
-        lp : np.array of length n
-        """
-        return np.log(mu) - np.log(dist.levels - mu)
+        return special.logit(mu / dist.levels) - np.log(dist.levels)
 
     def mu(self, lp, dist):
-        """
-        glm mean function, ie inverse of link function
-        this is useful for going from the linear prediction to mu
-
-        Parameters
-        ----------
-        lp : array-like of legth n
-        dist : Distribution instance
-
-        Returns
-        -------
-        mu : np.array of length n
-        """
-        elp = np.exp(lp)
-        return dist.levels * elp / (elp + 1)
+        return dist.levels * special.expit(lp)
 
     def gradient(self, mu, dist):
-        """
-        derivative of the link function wrt mu
-
-        Parameters
-        ----------
-        mu : array-like of legth n
-        dist : Distribution instance
-
-        Returns
-        -------
-        grad : np.array of length n
-        """
         return dist.levels / (mu * (dist.levels - mu))
 
 
 class LogLink(Link):
-    def __init__(self):
-        """
-        creates an instance of a LogitLink object
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        self
-        """
-        super().__init__(name="log")
+    name = "log"
 
     def link(self, mu, dist):
-        """
-        glm link function
-        this is useful for going from mu to the linear prediction
-
-        Parameters
-        ----------
-        mu : array-like of legth n
-        dist : Distribution instance
-
-        Returns
-        -------
-        lp : np.array of length n
-        """
         return np.log(mu)
 
     def mu(self, lp, dist):
-        """
-        glm mean function, ie inverse of link function
-        this is useful for going from the linear prediction to mu
-
-        Parameters
-        ----------
-        lp : array-like of legth n
-        dist : Distribution instance
-
-        Returns
-        -------
-        mu : np.array of length n
-        """
         return np.exp(lp)
 
     def gradient(self, mu, dist):
-        """
-        derivative of the link function wrt mu
-
-        Parameters
-        ----------
-        mu : array-like of legth n
-        dist : Distribution instance
-
-        Returns
-        -------
-        grad : np.array of length n
-        """
         return 1.0 / mu
 
 
 class InverseLink(Link):
-    def __init__(self):
-        """
-        creates an instance of a InverseLink object
 
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        self
-        """
-        super().__init__(name="inverse")
+    name = "inverse"
 
     def link(self, mu, dist):
-        """
-        glm link function
-        this is useful for going from mu to the linear prediction
-
-        Parameters
-        ----------
-        mu : array-like of legth n
-        dist : Distribution instance
-
-        Returns
-        -------
-        lp : np.array of length n
-        """
-        return mu**-1.0
+        return 1.0 / mu
 
     def mu(self, lp, dist):
-        """
-        glm mean function, ie inverse of link function
-        this is useful for going from the linear prediction to mu
-
-        Parameters
-        ----------
-        lp : array-like of legth n
-        dist : Distribution instance
-
-        Returns
-        -------
-        mu : np.array of length n
-        """
-        return lp**-1.0
+        return 1.0 / lp
 
     def gradient(self, mu, dist):
-        """
-        derivative of the link function wrt mu
-
-        Parameters
-        ----------
-        mu : array-like of legth n
-        dist : Distribution instance
-
-        Returns
-        -------
-        grad : np.array of length n
-        """
-        return -1 * mu**-2.0
+        return -1.0 / mu**2
 
 
 class InvSquaredLink(Link):
-    def __init__(self):
-        """
-        creates an instance of an InverseLink object
 
-        Parameters
-        ----------
-        name : str, default: None
-
-        Returns
-        -------
-        self
-        """
-        super().__init__(name="inv_squared")
+    name = "inv_squared"
 
     def link(self, mu, dist):
-        """
-        glm link function
-        this is useful for going from mu to the linear prediction
-
-        Parameters
-        ----------
-        mu : array-like of legth n
-        dist : Distribution instance
-
-        Returns
-        -------
-        lp : np.array of length n
-        """
-        return mu**-2.0
+        return 1.0 / mu**2
 
     def mu(self, lp, dist):
-        """
-        glm mean function, ie inverse of link function
-        this is useful for going from the linear prediction to mu
-
-        Parameters
-        ----------
-        lp : array-like of legth n
-        dist : Distribution instance
-
-        Returns
-        -------
-        mu : np.array of length n
-        """
-        return lp**-0.5
+        return 1.0 / np.sqrt(lp)
 
     def gradient(self, mu, dist):
-        """
-        derivative of the link function wrt mu
-
-        Parameters
-        ----------
-        mu : array-like of legth n
-        dist : Distribution instance
-
-        Returns
-        -------
-        grad : np.array of length n
-        """
-        return -2 * mu**-3.0
+        return -2.0 / mu**3
 
 
+# Dict comprehension instead of hard-coding the names again here
 LINKS = {
-    "identity": IdentityLink,
-    "log": LogLink,
-    "logit": LogitLink,
-    "inverse": InverseLink,
-    "inv_squared": InvSquaredLink,
+    l.name: l
+    for l in [
+        IdentityLink,
+        LogLink,
+        LogitLink,
+        InverseLink,
+        InvSquaredLink,
+    ]
 }
+
+
+if __name__ == "__main__":
+    import pytest
+
+    pytest.main(args=[".", "-v", "--capture=sys", "-k TestLink"])

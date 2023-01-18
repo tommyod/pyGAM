@@ -2,7 +2,7 @@ codecov
 mock
 future
 numpy
-progressbar2
+tqdm
 pytest
 pytest-cov
 pytest-pylint

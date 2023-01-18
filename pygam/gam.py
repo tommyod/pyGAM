@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import division, absolute_import
 from collections import defaultdict
 from collections import OrderedDict
 from copy import deepcopy
-from progressbar import ProgressBar
 import warnings
 
 import numpy as np
@@ -144,6 +142,11 @@ __all__ = [
 EPS = np.finfo(np.float64).eps  # machine epsilon
 
 
+from pygam.log import setup_custom_logger
+
+logger = setup_custom_logger(__name__)
+
+
 class GAM(Core, MetaTermMixin):
     """Generalized Additive Model
 
@@ -223,7 +226,7 @@ class GAM(Core, MetaTermMixin):
         callbacks=["deviance", "diffs"],
         fit_intercept=True,
         verbose=False,
-        **kwargs
+        **kwargs,
     ):
 
         self.max_iter = max_iter
@@ -249,7 +252,9 @@ class GAM(Core, MetaTermMixin):
         # self._include = ['lam']
 
         # call super and exclude any variables
-        super(GAM, self).__init__()
+        super().__init__()
+
+        logger.info("Created GAM instance")
 
     # @property
     # def lam(self):
@@ -558,6 +563,7 @@ class GAM(Core, MetaTermMixin):
         constraint_l2 = self._constraint_l2
         while constraint_l2 <= self._constraint_l2_max:
             try:
+
                 L = cholesky(A, **kwargs)
                 self._constraint_l2 = constraint_l2
                 return L
@@ -718,6 +724,7 @@ class GAM(Core, MetaTermMixin):
             This method implements the suggestions in
             Wood, section 2.2.2 Geometry and IRLS convergence, pg 80
         """
+        logger.info("Calling `_initial_estimate`")
 
         # do a simple initialization for LinearGAMs
         if isinstance(self, LinearGAM):
@@ -778,7 +785,8 @@ class GAM(Core, MetaTermMixin):
         min_n_m = np.min([m, n])
         Dinv = np.zeros((min_n_m + m, m)).T
 
-        for _ in range(self.max_iter):
+        for iteration in range(1, self.max_iter + 1):
+            logger.info(f"PIRLS iteration {iteration}")
 
             # recompute cholesky if needed
             if self.terms.hasconstraint:
@@ -833,6 +841,7 @@ class GAM(Core, MetaTermMixin):
 
             # check convergence
             if diff < self.tol:
+                logger.info(f"PIRLS converged {diff} < {self.tol}")
                 break
 
         # estimate statistics even if not converged
@@ -840,7 +849,6 @@ class GAM(Core, MetaTermMixin):
         if diff < self.tol:
             return
 
-        print("did not converge")
         return
 
     # def _pirls_naive(self, X, y):
@@ -956,6 +964,8 @@ class GAM(Core, MetaTermMixin):
         self : object
             Returns fitted GAM object
         """
+        logger.info("Created GAM instance")
+        print("fit")
 
         # validate parameters
         self._validate_params()
@@ -1803,9 +1813,7 @@ class GAM(Core, MetaTermMixin):
             stacklevel=2,
         )
 
-    def gridsearch(
-        self, X, y, weights=None, return_scores=False, keep_best=True, objective="auto", progress=True, **param_grids
-    ):
+    def gridsearch(self, X, y, weights=None, return_scores=False, keep_best=True, objective="auto", **param_grids):
         """
         Performs a grid search over a space of parameters for a given
         objective
@@ -1846,9 +1854,6 @@ class GAM(Core, MetaTermMixin):
             Metric to optimize.
             If `auto`, then grid search will optimize `GCV` for models with unknown
             scale and `UBRE` for models with known scale.
-
-        progress : bool, optional
-            whether to display a progress bar
 
         **kwargs
             pairs of parameters and iterables of floats, or
@@ -2021,16 +2026,8 @@ class GAM(Core, MetaTermMixin):
             best_model = models[-1]
             best_score = scores[-1]
 
-        # make progressbar optional
-        if progress:
-            pbar = ProgressBar()
-        else:
-
-            def pbar(x):
-                return x
-
         # loop through candidate model params
-        for param_grid in pbar(param_grid_list):
+        for param_grid in param_grid_list:
             try:
                 # try fitting
                 # define new model
@@ -2401,10 +2398,10 @@ class LinearGAM(GAM):
         callbacks=["deviance", "diffs"],
         fit_intercept=True,
         verbose=False,
-        **kwargs
+        **kwargs,
     ):
         self.scale = scale
-        super(LinearGAM, self).__init__(
+        super().__init__(
             terms=terms,
             distribution=NormalDist(scale=self.scale),
             link="identity",
@@ -2412,10 +2409,12 @@ class LinearGAM(GAM):
             tol=tol,
             fit_intercept=fit_intercept,
             verbose=verbose,
-            **kwargs
+            **kwargs,
         )
 
         self._exclude += ["distribution", "link"]
+
+        logger.info("Created linearGAM")
 
     def _validate_params(self):
         """
@@ -2430,7 +2429,7 @@ class LinearGAM(GAM):
         None
         """
         self.distribution = NormalDist(scale=self.scale)
-        super(LinearGAM, self)._validate_params()
+        super()._validate_params()
 
     def prediction_intervals(self, X, width=0.95, quantiles=None):
         """
@@ -2537,11 +2536,11 @@ class LogisticGAM(GAM):
         callbacks=["deviance", "diffs", "accuracy"],
         fit_intercept=True,
         verbose=False,
-        **kwargs
+        **kwargs,
     ):
 
         # call super
-        super(LogisticGAM, self).__init__(
+        super().__init__(
             terms=terms,
             distribution="binomial",
             link="logit",
@@ -2550,7 +2549,7 @@ class LogisticGAM(GAM):
             callbacks=callbacks,
             fit_intercept=fit_intercept,
             verbose=verbose,
-            **kwargs
+            **kwargs,
         )
         # ignore any variables
         self._exclude += ["distribution", "link"]
@@ -2718,11 +2717,11 @@ class PoissonGAM(GAM):
         callbacks=["deviance", "diffs"],
         fit_intercept=True,
         verbose=False,
-        **kwargs
+        **kwargs,
     ):
 
         # call super
-        super(PoissonGAM, self).__init__(
+        super().__init__(
             terms=terms,
             distribution="poisson",
             link="log",
@@ -2731,7 +2730,7 @@ class PoissonGAM(GAM):
             callbacks=callbacks,
             fit_intercept=fit_intercept,
             verbose=verbose,
-            **kwargs
+            **kwargs,
         )
         # ignore any variables
         self._exclude += ["distribution", "link"]
@@ -2875,7 +2874,7 @@ class PoissonGAM(GAM):
             Returns fitted GAM object
         """
         y, weights = self._exposure_to_weights(y, exposure, weights)
-        return super(PoissonGAM, self).fit(X, y, weights)
+        return super().fit(X, y, weights)
 
     def predict(self, X, exposure=None):
         """
@@ -2985,7 +2984,7 @@ class PoissonGAM(GAM):
             self, ie possibly the newly fitted model
         """
         y, weights = self._exposure_to_weights(y, exposure, weights)
-        return super(PoissonGAM, self).gridsearch(
+        return super().gridsearch(
             X, y, weights=weights, return_scores=return_scores, keep_best=keep_best, objective=objective, **param_grids
         )
 
@@ -3076,10 +3075,10 @@ class GammaGAM(GAM):
         callbacks=["deviance", "diffs"],
         fit_intercept=True,
         verbose=False,
-        **kwargs
+        **kwargs,
     ):
         self.scale = scale
-        super(GammaGAM, self).__init__(
+        super().__init__(
             terms=terms,
             distribution=GammaDist(scale=self.scale),
             link="log",
@@ -3088,7 +3087,7 @@ class GammaGAM(GAM):
             callbacks=callbacks,
             fit_intercept=fit_intercept,
             verbose=verbose,
-            **kwargs
+            **kwargs,
         )
 
         self._exclude += ["distribution", "link"]
@@ -3106,7 +3105,7 @@ class GammaGAM(GAM):
         None
         """
         self.distribution = GammaDist(scale=self.scale)
-        super(GammaGAM, self)._validate_params()
+        super()._validate_params()
 
 
 class InvGaussGAM(GAM):
@@ -3195,10 +3194,10 @@ class InvGaussGAM(GAM):
         callbacks=["deviance", "diffs"],
         fit_intercept=True,
         verbose=False,
-        **kwargs
+        **kwargs,
     ):
         self.scale = scale
-        super(InvGaussGAM, self).__init__(
+        super().__init__(
             terms=terms,
             distribution=InvGaussDist(scale=self.scale),
             link="log",
@@ -3207,7 +3206,7 @@ class InvGaussGAM(GAM):
             callbacks=callbacks,
             fit_intercept=fit_intercept,
             verbose=verbose,
-            **kwargs
+            **kwargs,
         )
 
         self._exclude += ["distribution", "link"]
@@ -3225,7 +3224,7 @@ class InvGaussGAM(GAM):
         None
         """
         self.distribution = InvGaussDist(scale=self.scale)
-        super(InvGaussGAM, self)._validate_params()
+        super()._validate_params()
 
 
 class ExpectileGAM(GAM):
@@ -3305,11 +3304,11 @@ class ExpectileGAM(GAM):
         fit_intercept=True,
         expectile=0.5,
         verbose=False,
-        **kwargs
+        **kwargs,
     ):
         self.scale = scale
         self.expectile = expectile
-        super(ExpectileGAM, self).__init__(
+        super().__init__(
             terms=terms,
             distribution=NormalDist(scale=self.scale),
             link="identity",
@@ -3318,7 +3317,7 @@ class ExpectileGAM(GAM):
             callbacks=callbacks,
             fit_intercept=fit_intercept,
             verbose=verbose,
-            **kwargs
+            **kwargs,
         )
 
         self._exclude += ["distribution", "link"]
@@ -3338,7 +3337,7 @@ class ExpectileGAM(GAM):
         if self.expectile >= 1 or self.expectile <= 0:
             raise ValueError("expectile must be in (0,1), but found {}".format(self.expectile))
         self.distribution = NormalDist(scale=self.scale)
-        super(ExpectileGAM, self)._validate_params()
+        super()._validate_params()
 
     def _W(self, mu, weights, y=None):
         """

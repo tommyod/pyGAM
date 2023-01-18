@@ -2,8 +2,6 @@
 Core classes
 """
 
-from __future__ import absolute_import
-
 import numpy as np
 
 from pygam.utils import round_to_n_decimal_places, flatten
@@ -105,7 +103,7 @@ class Core:
         -------
         self
         """
-        self._name = name
+        self._name = getattr(self, "name", None) or name
         self._line_width = line_width
         self._line_offset = line_offset
 

@@ -2,7 +2,6 @@
 Pygam utilities
 """
 
-from __future__ import division
 from copy import deepcopy
 import numbers
 import sys
@@ -19,6 +18,11 @@ try:
     SKSPIMPORT = True
 except ImportError:
     SKSPIMPORT = False
+
+
+from pygam.log import setup_custom_logger
+
+logger = setup_custom_logger(__name__)
 
 
 class NotPositiveDefiniteError(ValueError):
@@ -48,6 +52,7 @@ def cholesky(A, sparse=True, verbose=True):
         whether to print warnings
     """
     if SKSPIMPORT:
+        logger.info("Cholesky decomposition with scikit-sparse")
         A = sp.sparse.csc_matrix(A)
         try:
             F = spcholesky(A)
@@ -462,7 +467,7 @@ class TablePrinter(object):
         @param sep: string, separation between columns
         @param ul: string, character to underline column label, or None for no underlining
         """
-        super(TablePrinter, self).__init__()
+        super().__init__()
         self.fmt = str(sep).join("{lb}{0}:{1}{rb}".format(key, width, lb="{", rb="}") for heading, key, width in fmt)
         self.head = {key: heading for heading, key, width in fmt}
         self.ul = {key: str(ul) * width for heading, key, width in fmt} if ul else None

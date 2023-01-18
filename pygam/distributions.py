@@ -2,7 +2,6 @@
 Distributions
 """
 
-from __future__ import division, absolute_import
 from functools import wraps
 from abc import ABCMeta
 from abc import abstractmethod
@@ -56,7 +55,7 @@ class Distribution(Core):
         """
         self.scale = scale
         self._known_scale = self.scale is not None
-        super(Distribution, self).__init__(name=name)
+        super().__init__(name=name)
         if not self._known_scale:
             self._exclude += ["scale"]
 
@@ -128,7 +127,7 @@ class NormalDist(Distribution):
         -------
         self
         """
-        super(NormalDist, self).__init__(name="normal", scale=scale)
+        super().__init__(name="normal", scale=scale)
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -249,7 +248,7 @@ class BinomialDist(Distribution):
         if levels is None:
             levels = 1
         self.levels = levels
-        super(BinomialDist, self).__init__(name="binomial", scale=1.0)
+        super().__init__(name="binomial", scale=1.0)
         self._exclude.append("scale")
 
     def log_pdf(self, y, mu, weights=None):
@@ -355,7 +354,7 @@ class PoissonDist(Distribution):
         -------
         self
         """
-        super(PoissonDist, self).__init__(name="poisson", scale=1.0)
+        super().__init__(name="poisson", scale=1.0)
         self._exclude.append("scale")
 
     def log_pdf(self, y, mu, weights=None):
@@ -468,7 +467,7 @@ class GammaDist(Distribution):
         -------
         self
         """
-        super(GammaDist, self).__init__(name="gamma", scale=scale)
+        super().__init__(name="gamma", scale=scale)
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -578,7 +577,7 @@ class InvGaussDist(Distribution):
         -------
         self
         """
-        super(InvGaussDist, self).__init__(name="inv_gauss", scale=scale)
+        super().__init__(name="inv_gauss", scale=scale)
 
     def log_pdf(self, y, mu, weights=None):
         """
