@@ -6,12 +6,13 @@ from abc import abstractmethod, abstractproperty
 from collections import defaultdict
 import warnings
 from copy import deepcopy
+from collections.abc import Iterable
 
 import numpy as np
 import scipy as sp
 
 from pygam.core import Core, nice_repr
-from pygam.utils import isiterable, check_param, flatten, gen_edge_knots, b_spline_basis, tensor_product
+from pygam.utils import check_param, flatten, gen_edge_knots, b_spline_basis, tensor_product
 from pygam.penalties import PENALTIES, CONSTRAINTS
 
 
@@ -157,7 +158,7 @@ class Term(Core):
             )
 
         # penalties
-        if not isiterable(self.penalties):
+        if not isinstance(self.penalties, Iterable):
             self.penalties = [self.penalties]
 
         for i, p in enumerate(self.penalties):
@@ -168,7 +169,7 @@ class Term(Core):
                 )
 
         # check lams and distribute to penalites
-        if not isiterable(self.lam):
+        if not isinstance(self.lam, Iterable):
             self.lam = [self.lam]
 
         for lam in self.lam:
@@ -183,7 +184,7 @@ class Term(Core):
             )
 
         # constraints
-        if not isiterable(self.constraints):
+        if not isinstance(self.constraints, Iterable):
             self.constraints = [self.constraints]
 
         for i, c in enumerate(self.constraints):
@@ -981,7 +982,7 @@ class MetaTermMixin(object):
         loc = self._super_get("_term_location")
         return (
             self._super_has(loc)
-            and isiterable(self._super_get(loc))
+            and isinstance(self._super_get(loc), Iterable)
             and len(self._super_get(loc)) > 0
             and all([isinstance(term, Term) for term in self._super_get(loc)])
         )
@@ -1006,7 +1007,7 @@ class MetaTermMixin(object):
             size = np.atleast_1d(flatten(getattr(self, name))).size
 
             # check shapes
-            if isiterable(value):
+            if isinstance(value, Iterable):
                 value = flatten(value)
                 if len(value) != size:
                     raise ValueError("Expected {} to have length {}, but found {} = {}".format(name, size, name, value))
@@ -1170,7 +1171,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
             raise ValueError("TensorTerm requires at least 2 marginal terms")
 
         for k, v in kwargs.items():
-            if isiterable(v):
+            if isinstance(v, Iterable):
                 if len(v) != m:
                     raise ValueError("Expected {} to have length {}, but found {} = {}".format(k, m, k, v))
             else:

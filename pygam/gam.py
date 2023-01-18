@@ -4,6 +4,7 @@ from collections import defaultdict
 from collections import OrderedDict
 from copy import deepcopy
 import warnings
+from collections.abc import Iterable
 
 import numpy as np
 import scipy as sp
@@ -59,7 +60,6 @@ from pygam.utils import b_spline_basis
 from pygam.utils import combine
 from pygam.utils import cholesky
 from pygam.utils import check_param
-from pygam.utils import isiterable
 from pygam.utils import NotPositiveDefiniteError
 from pygam.utils import OptimizationError
 
@@ -120,7 +120,6 @@ __all__ = [
     "combine",
     "cholesky",
     "check_param",
-    "isiterable",
     "NotPositiveDefiniteError",
     "OptimizationError",
     "Term",
@@ -319,7 +318,7 @@ class GAM(Core, MetaTermMixin):
             self.link = LINKS[self.link]()
 
         # callbacks
-        if not isiterable(self.callbacks):
+        if not isinstance(self.callbacks, Iterable):
             raise ValueError("Callbacks must be iterable, but found {}".format(self.callbacks))
 
         if not all([c in CALLBACKS or isinstance(c, CallBack) for c in self.callbacks]):
@@ -1971,7 +1970,7 @@ class GAM(Core, MetaTermMixin):
                 raise ValueError("unknown parameter: {}".format(param))
 
             # check grid is iterable at all
-            if not (isiterable(grid) and (len(grid) > 1)):
+            if not (isinstance(grid, Iterable) and (len(grid) > 1)):
                 raise ValueError(
                     "{} grid must either be iterable of "
                     "iterables, or an iterable of lengnth > 1, "
@@ -1979,7 +1978,7 @@ class GAM(Core, MetaTermMixin):
                 )
 
             # prepare grid
-            if any(isiterable(g) for g in grid):
+            if any(isinstance(g, Iterable) for g in grid):
 
                 # get required parameter shape
                 target_len = len(flatten(getattr(self, param)))

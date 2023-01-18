@@ -6,6 +6,7 @@ from copy import deepcopy
 import numbers
 import sys
 import warnings
+from collections.abc import Iterable
 
 import scipy as sp
 import numpy as np
@@ -385,7 +386,7 @@ def check_param(param, param_name, dtype, constraint=None, iterable=True, max_de
     if iterable:
         if check_iterable_depth(param) > max_depth:
             raise TypeError(msg)
-    if (not iterable) and isiterable(param):
+    if (not iterable) and isinstance(param, Iterable):
         raise TypeError(msg)
 
     # check param is correct dtype
@@ -706,25 +707,6 @@ def b_spline_basis(x, edge_knots, n_splines=20, spline_order=3, sparse=True, per
     return bases
 
 
-def ylogydu(y, u):
-    """
-    tool to give desired output for the limit as y -> 0, which is 0
-
-    Parameters
-    ----------
-    y : array-like of len(n)
-    u : array-like of len(n)
-
-    Returns
-    -------
-    np.array len(n)
-    """
-    mask = np.atleast_1d(y) != 0.0
-    out = np.zeros_like(u)
-    out[mask] = y[mask] * np.log(y[mask] / u[mask])
-    return out
-
-
 def combine(*args):
     """
     tool to perform tree search via recursion
@@ -752,28 +734,6 @@ def combine(*args):
         return [[arg] for arg in args[0]]
 
 
-def isiterable(obj, reject_string=True):
-    """convenience tool to detect if something is iterable.
-    in python3, strings count as iterables to we have the option to exclude them
-
-    Parameters:
-    -----------
-    obj : object to analyse
-    reject_string : bool, whether to ignore strings
-
-    Returns:
-    --------
-    bool, if the object is itereable.
-    """
-
-    iterable = hasattr(obj, "__len__")
-
-    if reject_string:
-        iterable = iterable and not isinstance(obj, str)
-
-    return iterable
-
-
 def check_iterable_depth(obj, max_depth=100):
     """find the maximum depth of nesting of the iterable
 
@@ -791,12 +751,12 @@ def check_iterable_depth(obj, max_depth=100):
     def find_iterables(obj):
         iterables = []
         for item in obj:
-            if isiterable(item):
+            if isinstance(item, Iterable):
                 iterables += list(item)
         return iterables
 
     depth = 0
-    while (depth < max_depth) and isiterable(obj) and len(obj) > 0:
+    while (depth < max_depth) and isinstance(obj, Iterable) and len(obj) > 0:
         depth += 1
         obj = find_iterables(obj)
     return depth
@@ -821,11 +781,11 @@ def flatten(iterable):
     -------
     flattened object
     """
-    if isiterable(iterable):
+    if isinstance(iterable, Iterable):
         flat = []
         for item in list(iterable):
             item = flatten(item)
-            if not isiterable(item):
+            if not isinstance(item, Iterable):
                 item = [item]
             flat += item
         return flat

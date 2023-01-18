@@ -10,7 +10,7 @@ import scipy as sp
 import numpy as np
 
 from pygam.core import Core
-from pygam.utils import ylogydu
+from scipy.special import rel_entr
 
 
 def multiply_weights(deviance):
@@ -52,6 +52,7 @@ class Distribution(Core, metaclass=ABCMeta):
         -------
         self
         """
+        super().__init__()
         self.scale = scale
         self._known_scale = self.scale is not None
         if not self._known_scale:
@@ -314,7 +315,7 @@ class BinomialDist(Distribution):
         -------
         deviances : np.array of length n
         """
-        dev = 2 * (ylogydu(y, mu) + ylogydu(self.levels - y, self.levels - mu))
+        dev = 2 * (rel_entr(y, mu) + rel_entr(self.levels - y, self.levels - mu))
         if scaled:
             dev /= self.scale
         return dev
@@ -429,7 +430,7 @@ class PoissonDist(Distribution):
         -------
         deviances : np.array of length n
         """
-        dev = 2 * (ylogydu(y, mu) - (y - mu))
+        dev = 2 * (rel_entr(y, mu) - (y - mu))
 
         if scaled:
             dev /= self.scale
@@ -679,3 +680,6 @@ DISTRIBUTIONS = {
         InvGaussDist,
     ]
 }
+
+if __name__ == "__main__":
+    d = NormalDist()

@@ -169,3 +169,7 @@ class Core:
             if parameter in param_names or force or (hasattr(self, parameter) and parameter == parameter.strip("_")):
                 setattr(self, parameter, value)
         return self
+
+
+if __name__ == "__main__":
+    pass
