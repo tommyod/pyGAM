@@ -4,7 +4,6 @@ from __future__ import division, absolute_import
 from collections import defaultdict
 from collections import OrderedDict
 from copy import deepcopy
-from progressbar import ProgressBar
 import warnings
 
 import numpy as np
@@ -851,7 +850,6 @@ class GAM(Core, MetaTermMixin):
         if diff < self.tol:
             return
 
-        print("did not converge")
         return
 
     # def _pirls_naive(self, X, y):
@@ -1816,9 +1814,7 @@ class GAM(Core, MetaTermMixin):
             stacklevel=2,
         )
 
-    def gridsearch(
-        self, X, y, weights=None, return_scores=False, keep_best=True, objective="auto", progress=True, **param_grids
-    ):
+    def gridsearch(self, X, y, weights=None, return_scores=False, keep_best=True, objective="auto", **param_grids):
         """
         Performs a grid search over a space of parameters for a given
         objective
@@ -1859,9 +1855,6 @@ class GAM(Core, MetaTermMixin):
             Metric to optimize.
             If `auto`, then grid search will optimize `GCV` for models with unknown
             scale and `UBRE` for models with known scale.
-
-        progress : bool, optional
-            whether to display a progress bar
 
         **kwargs
             pairs of parameters and iterables of floats, or
@@ -2034,16 +2027,8 @@ class GAM(Core, MetaTermMixin):
             best_model = models[-1]
             best_score = scores[-1]
 
-        # make progressbar optional
-        if progress:
-            pbar = ProgressBar()
-        else:
-
-            def pbar(x):
-                return x
-
         # loop through candidate model params
-        for param_grid in pbar(param_grid_list):
+        for param_grid in param_grid_list:
             try:
                 # try fitting
                 # define new model
