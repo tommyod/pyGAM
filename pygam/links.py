@@ -7,16 +7,12 @@ from pygam.core import Core
 
 
 class Link(Core):
-    def __init__(self, name=None):
-        super().__init__(name=name)
+    pass
 
 
 class IdentityLink(Link):
 
     name = "identity"
-
-    def __init__(self):
-        super().__init__(name="identity")
 
     def link(self, mu, dist):
         return mu
@@ -29,8 +25,8 @@ class IdentityLink(Link):
 
 
 class LogitLink(Link):
-    def __init__(self):
-        super().__init__(name="logit")
+
+    name = "logit"
 
     def link(self, mu, dist):
         return np.log(mu) - np.log(dist.levels - mu)
@@ -44,8 +40,7 @@ class LogitLink(Link):
 
 
 class LogLink(Link):
-    def __init__(self):
-        super().__init__(name="log")
+    name = "log"
 
     def link(self, mu, dist):
         return np.log(mu)
@@ -58,8 +53,8 @@ class LogLink(Link):
 
 
 class InverseLink(Link):
-    def __init__(self):
-        super().__init__(name="inverse")
+
+    name = "inverse"
 
     def link(self, mu, dist):
         return mu**-1.0
@@ -72,8 +67,8 @@ class InverseLink(Link):
 
 
 class InvSquaredLink(Link):
-    def __init__(self):
-        super().__init__(name="inv_squared")
+
+    name = "inv_squared"
 
     def link(self, mu, dist):
         return mu**-2.0
@@ -86,9 +81,12 @@ class InvSquaredLink(Link):
 
 
 LINKS = {
-    "identity": IdentityLink,
-    "log": LogLink,
-    "logit": LogitLink,
-    "inverse": InverseLink,
-    "inv_squared": InvSquaredLink,
+    l.name: l
+    for l in [
+        IdentityLink,
+        LogLink,
+        LogitLink,
+        InverseLink,
+        InvSquaredLink,
+    ]
 }

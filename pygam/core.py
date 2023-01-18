@@ -103,7 +103,7 @@ class Core:
         -------
         self
         """
-        self._name = name
+        self._name = getattr(self, "name", None) or name
         self._line_width = line_width
         self._line_offset = line_offset
 
