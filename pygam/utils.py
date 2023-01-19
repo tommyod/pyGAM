@@ -590,6 +590,8 @@ def b_spline_basis(x, edge_knots, n_splines=20, spline_order=3, sparse=True, per
     print(x, edge_knots, n_splines, spline_order, sparse, periodic, verbose)
 
     # n_splines=n_knots + degree - 1 (n_knots - 1 for extrapolation="periodic")
+    # n_splines - degree + 1 =n_knots + degree - 1 (n_knots - 1 for extrapolation="periodic")
+
     # n_knots=n_splines + degree - 1 (n_knots - 1 for extrapolation="periodic")
 
     # Add edge knots
@@ -600,7 +602,7 @@ def b_spline_basis(x, edge_knots, n_splines=20, spline_order=3, sparse=True, per
     # n_knots = n_splines + 1 if periodic else n_splines - 2
 
     transformer = SplineTransformer(
-        n_knots=n_splines + spline_order - 1 - (1 if periodic else 0),
+        n_knots=n_splines + 1 + (0 if periodic else -spline_order),
         degree=spline_order,
         knots="uniform",
         extrapolation="periodic" if periodic else "linear",
@@ -615,6 +617,8 @@ def b_spline_basis(x, edge_knots, n_splines=20, spline_order=3, sparse=True, per
     # bases = bases[:-2]  # Remove edge knots
 
     assert bases.shape[0] == len(x)
+    print(bases.shape[1], n_splines)
+    assert bases.shape[1] == n_splines
 
     if sparse:
         return sp.sparse.csc_matrix(bases)
