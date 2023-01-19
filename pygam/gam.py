@@ -3,6 +3,7 @@
 from collections import defaultdict
 from collections import OrderedDict
 from copy import deepcopy
+from itertools import product
 import warnings
 
 import numpy as np
@@ -57,7 +58,6 @@ from pygam.utils import TablePrinter
 from pygam.utils import space_row
 from pygam.utils import sig_code
 from pygam.utils import b_spline_basis
-from pygam.utils import combine
 from pygam.utils import cholesky
 from pygam.utils import check_param
 from pygam.utils import isiterable
@@ -1964,6 +1964,7 @@ class GAM(Core, MetaTermMixin):
         admissible_params = list(self.get_params()) + self._plural
         params = []
         grids = []
+
         for param, grid in list(param_grids.items()):
 
             # check param exists
@@ -1994,22 +1995,20 @@ class GAM(Core, MetaTermMixin):
                 msg = "{} grid should have {} columns, " "but found grid with {} columns".format(
                     param, target_len, len(grid)
                 )
+
                 if cartesian:
                     if len(grid) != target_len:
                         raise ValueError(msg)
-                    grid = combine(*grid)
 
-                if not all([len(subgrid) == target_len for subgrid in grid]):
-                    raise ValueError(msg)
+                    # we should consider each element in `grid` its own dimension
+                    grid = product(*grid)
+                else:
+                    if not all([len(subgrid) == target_len for subgrid in grid]):
+                        raise ValueError(msg)
 
             # save param name and grid
             params.append(param)
             grids.append(grid)
-
-        # build a list of dicts of candidate model params
-        param_grid_list = []
-        for candidate in combine(*grids):
-            param_grid_list.append(dict(zip(params, candidate)))
 
         # set up data collection
         best_model = None  # keep the best model
@@ -2027,7 +2026,11 @@ class GAM(Core, MetaTermMixin):
             best_score = scores[-1]
 
         # loop through candidate model params
-        for param_grid in param_grid_list:
+        for grid in product(*grids):
+
+            # build dict of candidate model params
+            param_grid = dict(zip(params, grid))
+
             try:
                 # try fitting
                 # define new model
