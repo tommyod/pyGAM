@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from pygam import *
-from pygam.utils import check_X, check_y, check_X_y, sig_code, check_iterable_depth
+from pygam.utils import check_X, check_y, check_X_y, sig_code
 
 
 # TODO check dtypes works as expected
@@ -218,12 +218,6 @@ def test_b_spline_basis_extrapolates(mcycle_X_y):
     slopes.append((y[1] - y[0]) / (X[1] - X[0]))
 
     assert np.allclose(slopes[0], slopes[1], atol=1e-4)
-
-
-def test_iterable_depth():
-    it = [[[3]]]
-    assert check_iterable_depth(it) == 3
-    assert check_iterable_depth(it, max_depth=2) == 2
 
 
 def test_no_SKSPIMPORT(mcycle_X_y):

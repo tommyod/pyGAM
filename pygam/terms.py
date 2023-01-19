@@ -1650,42 +1650,18 @@ class TermList(Core, MetaTermMixin):
                 n_intercepts += 1
         return self
 
-    def pop(self, i=None):
-        """remove the ith term from the term list
-
-        Parameters
-        ---------
-        i : int, optional
-            term to remove from term list
-
-            by default the last term is popped.
-
-        Returns
-        -------
-        term : Term
-        """
-        if i is None:
-            i = len(self) - 1
-
-        if i >= len(self._terms) or i < 0:
-            raise ValueError("requested pop {}th term, but found only {} terms".format(i, len(self._terms)))
-
-        term = self._terms[i]
-        self._terms = self._terms[:i] + self._terms[i + 1 :]
-        return term
+    def pop(self, index=-1):
+        return self._terms.pop(index)
 
     @property
     def hasconstraint(self):
         """bool, whether the term has any constraints"""
-        constrained = False
-        for term in self._terms:
-            constrained = constrained or term.hasconstraint
-        return constrained
+        return any(term.hasconstraint for term in self._terms)
 
     @property
     def n_coefs(self):
         """Total number of coefficients contributed by the terms in the model"""
-        return sum([term.n_coefs for term in self._terms])
+        return sum(term.n_coefs for term in self._terms)
 
     def get_coef_indices(self, i=-1):
         """get the indices for the coefficients of a term in the term list
