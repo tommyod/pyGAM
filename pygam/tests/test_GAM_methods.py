@@ -24,6 +24,7 @@ def test_LogisticGAM_accuracy(default_X_y):
     check that we can compute accuracy correctly
     """
     X, y = default_X_y
+
     gam = LogisticGAM().fit(X, y)
 
     preds = gam.predict(X)

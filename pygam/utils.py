@@ -585,101 +585,33 @@ def b_spline_basis(x, edge_knots, n_splines=20, spline_order=3, sparse=True, per
     if (spline_order < 0) or not isinstance(spline_order, numbers.Integral):
         raise ValueError("spline_order must be int >= 1")
 
-    if n_splines < spline_order + 1:
-        raise ValueError(
-            "n_splines must be >= spline_order + 1. "
-            "found: n_splines = {} and spline_order = {}".format(n_splines, spline_order)
-        )
+    from sklearn.preprocessing import SplineTransformer
 
-    if n_splines == 0 and verbose:
-        warnings.warn("Requested 1 spline. This is equivalent to " "fitting an intercept", stacklevel=2)
+    print(x, edge_knots, n_splines, spline_order, sparse, periodic, verbose)
 
-    n_splines += spline_order * periodic
+    # Add edge knots
+    low_edge, high_edge = edge_knots
+    # x_transformed = x[(x >= low_edge) & (x <= high_edge)]
+    # x_transformed = np.hstack((x_transformed, edge_knots)).reshape(-1, 1)
 
-    # rescale edge_knots to [0,1], and generate boundary knots
-    edge_knots = np.sort(deepcopy(edge_knots))
-    offset = edge_knots[0]
-    scale = edge_knots[-1] - edge_knots[0]
-    if scale == 0:
-        scale = 1
-    boundary_knots = np.linspace(0, 1, 1 + n_splines - spline_order)
-    diff = np.diff(boundary_knots[:2])[0]
+    n_knots = n_splines + 1 if periodic else n_splines - 2
 
-    # rescale x as well
-    x = (np.ravel(deepcopy(x)) - offset) / scale
+    transformer = SplineTransformer(
+        n_knots=n_knots,
+        degree=spline_order,
+        knots="uniform",
+        extrapolation="periodic" if periodic else "linear",
+        include_bias=True,
+        order="C",
+    )
 
-    # wrap periodic values
-    if periodic:
-        x = x % (1 + 1e-9)
+    transformer.fit((np.array(edge_knots)).reshape(-1, 1))
 
-    # append 0 and 1 in order to get derivatives for extrapolation
-    x = np.r_[x, 0.0, 1.0]
+    bases = transformer.transform(x.reshape(-1, 1))
 
-    # determine extrapolation indices
-    x_extrapolte_l = x < 0
-    x_extrapolte_r = x > 1
-    x_interpolate = ~(x_extrapolte_r + x_extrapolte_l)
+    # bases = bases[:-2]  # Remove edge knots
 
-    # formatting
-    x = np.atleast_2d(x).T
-
-    # augment knots
-    aug = np.arange(1, spline_order + 1) * diff
-    aug_knots = np.r_[-aug[::-1], boundary_knots, 1 + aug]
-    aug_knots[-1] += 1e-9  # want last knot inclusive
-
-    # prepare Haar Basis
-    bases = (x >= aug_knots[:-1]).astype(int) * (x < aug_knots[1:]).astype(int)
-    bases[-1] = bases[-2][::-1]  # force symmetric bases at 0 and 1
-
-    # do recursion from Hastie et al. vectorized
-    maxi = len(aug_knots) - 1
-    for m in range(2, spline_order + 2):
-        maxi -= 1
-
-        # left sub-basis
-        num = x - aug_knots[:maxi]
-        num *= bases[:, :maxi]
-        denom = aug_knots[m - 1 : maxi + m - 1] - aug_knots[:maxi]
-        left = num / denom
-
-        # right sub-basis
-        num = (aug_knots[m : maxi + m] - x) * bases[:, 1 : maxi + 1]
-        denom = aug_knots[m : maxi + m] - aug_knots[1 : maxi + 1]
-        right = num / denom
-
-        # track previous bases and update
-        prev_bases = bases[-2:]
-        bases = left + right
-
-    if periodic and spline_order > 0:
-        # make spline domain periodic
-        bases[:, :spline_order] = np.max([bases[:, :spline_order], bases[:, -spline_order:]], axis=0)
-        # remove extra splines used only for ensuring correct domain
-        bases = bases[:, :-spline_order]
-
-    # extrapolate
-    # since we have repeated end-knots, only the last 2 basis functions are
-    # non-zero at the end-knots, and they have equal and opposite gradient.
-    if (any(x_extrapolte_r) or any(x_extrapolte_l)) and spline_order > 0:
-        bases[~x_interpolate] = 0.0
-
-        denom = aug_knots[spline_order:-1] - aug_knots[: -spline_order - 1]
-        left = prev_bases[:, :-1] / denom
-
-        denom = aug_knots[spline_order + 1 :] - aug_knots[1:-spline_order]
-        right = prev_bases[:, 1:] / denom
-
-        grads = (spline_order) * (left - right)
-
-        if any(x_extrapolte_l):
-            val = grads[0] * x[x_extrapolte_l] + bases[-2]
-            bases[x_extrapolte_l] = val
-        if any(x_extrapolte_r):
-            val = grads[1] * (x[x_extrapolte_r] - 1) + bases[-1]
-            bases[x_extrapolte_r] = val
-    # get rid of the added values at 0, and 1
-    bases = bases[:-2]
+    assert bases.shape[0] == len(x)
 
     if sparse:
         return sp.sparse.csc_matrix(bases)

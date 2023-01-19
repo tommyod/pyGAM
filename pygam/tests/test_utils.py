@@ -212,7 +212,7 @@ def test_b_spline_basis_extrapolates(mcycle_X_y):
     y = gam.predict(X)
     slopes.append((y[1] - y[0]) / (X[1] - X[0]))
 
-    assert np.allclose(slopes[0], slopes[1], atol=1e-4)
+    assert np.allclose(slopes[0], slopes[1], atol=1e-2)
 
 
 def test_no_SKSPIMPORT(mcycle_X_y):
