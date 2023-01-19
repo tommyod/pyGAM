@@ -1,5 +1,5 @@
 [build-system]
-requires = ["flit_core>=3.2,<4", "numpy", "tqdm", "scipy", "pandas", "future"]
+requires = ["flit_core>=3.2,<4", "numpy", "tqdm", "scipy", "pandas", "future", "scikit-learn"]
 build-backend = "flit_core.buildapi"
 
 [project]

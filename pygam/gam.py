@@ -9,6 +9,7 @@ import numpy as np
 import scipy as sp
 
 from pygam.core import Core
+from sklearn.utils import check_X_y
 
 from pygam.penalties import derivative
 from pygam.penalties import l2
@@ -46,7 +47,6 @@ from pygam.callbacks import CALLBACKS
 
 from pygam.utils import check_y
 from pygam.utils import check_X
-from pygam.utils import check_X_y
 from pygam.utils import make_2d
 from pygam.utils import flatten
 from pygam.utils import check_array
@@ -107,7 +107,6 @@ __all__ = [
     "CALLBACKS",
     "check_y",
     "check_X",
-    "check_X_y",
     "make_2d",
     "flatten",
     "check_array",
@@ -2587,7 +2586,7 @@ class LogisticGAM(GAM):
 
         if mu is None:
             mu = self.predict_mu(X)
-        check_X_y(mu, y)
+
         return ((mu > 0.5).astype(int) == y).mean()
 
     def score(self, X, y):

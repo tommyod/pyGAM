@@ -307,23 +307,6 @@ def check_X(X, n_feats=None, min_samples=1, edge_knots=None, dtypes=None, featur
     return X
 
 
-def check_X_y(X, y):
-    """
-    tool to ensure input and output data have the same number of samples
-
-    Parameters
-    ----------
-    X : array-like
-    y : array-like
-
-    Returns
-    -------
-    None
-    """
-    if len(X) != len(y):
-        raise ValueError("Inconsistent input and output data shapes. " "found X: {} and y: {}".format(X.shape, y.shape))
-
-
 def check_lengths(*arrays):
     """
     tool to ensure input and output data have the same number of samples
