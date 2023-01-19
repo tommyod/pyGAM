@@ -37,6 +37,10 @@ class TestLink:
         # numbers and numerics...
         assert np.mean(np.isclose(f_x_deriv, f_x_finite_diff) > 0.9)
 
+    def test_loglink_domain(self):
+        loglink = LINKS["log"]()
+        assert loglink.get_domain(dist=None) == [0, np.inf]
+
 
 if __name__ == "__main__":
     import pytest

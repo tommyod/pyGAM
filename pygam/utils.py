@@ -156,7 +156,7 @@ def check_y(y, link, dist, min_samples=1, verbose=True):
             raise ValueError(
                 "y data is not in domain of {} link function. "
                 "Expected domain: {}, but found {}".format(
-                    link, get_link_domain(link, dist), [float("%.2f" % np.min(y)), float("%.2f" % np.max(y))]
+                    link, link.get_domain(dist), [float("%.2f" % np.min(y)), float("%.2f" % np.max(y))]
                 )
             )
     return y
@@ -310,24 +310,6 @@ def check_param(param, param_name, dtype, constraint=None, iterable=True, max_de
             raise ValueError(msg)
 
     return param
-
-
-def get_link_domain(link, dist):
-    """
-    tool to identify the domain of a given monotonic link function
-
-    Parameters
-    ----------
-    link : Link object
-    dist : Distribution object
-
-    Returns
-    -------
-    domain : list of length 2, representing the interval of the domain.
-    """
-    domain = np.array([-np.inf, -1, 0, 1, np.inf])
-    domain = domain[~np.isnan(link.link(domain, dist))]
-    return [domain[0], domain[-1]]
 
 
 def load_diagonal(cov, load=None):
