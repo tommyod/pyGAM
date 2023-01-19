@@ -33,13 +33,12 @@ def divide_weights(V):
     return divided
 
 
-class Distribution(Core):
-    __metaclass__ = ABCMeta
+class Distribution(Core, metaclass=ABCMeta):
     """
     base distribution class
     """
 
-    def __init__(self, name=None, scale=None):
+    def __init__(self, scale=None):
         """
         creates an instance of the Distribution class
 
@@ -53,9 +52,9 @@ class Distribution(Core):
         -------
         self
         """
+        super().__init__()
         self.scale = scale
         self._known_scale = self.scale is not None
-        super().__init__(name=name)
         if not self._known_scale:
             self._exclude += ["scale"]
 
@@ -114,6 +113,8 @@ class NormalDist(Distribution):
     Normal Distribution
     """
 
+    name = "normal"
+
     def __init__(self, scale=None):
         """
         creates an instance of the NormalDist class
@@ -127,7 +128,7 @@ class NormalDist(Distribution):
         -------
         self
         """
-        super().__init__(name="normal", scale=scale)
+        super().__init__(scale=scale)
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -232,6 +233,8 @@ class BinomialDist(Distribution):
     Binomial Distribution
     """
 
+    name = "binomial"
+
     def __init__(self, levels=1):
         """
         creates an instance of the Binomial class
@@ -245,10 +248,8 @@ class BinomialDist(Distribution):
         -------
         self
         """
-        if levels is None:
-            levels = 1
-        self.levels = levels
-        super().__init__(name="binomial", scale=1.0)
+        self.levels = levels if levels else None
+        super().__init__(scale=1.0)
         self._exclude.append("scale")
 
     def log_pdf(self, y, mu, weights=None):
@@ -342,6 +343,8 @@ class PoissonDist(Distribution):
     Poisson Distribution
     """
 
+    name = "poisson"
+
     def __init__(self):
         """
         creates an instance of the PoissonDist class
@@ -354,7 +357,7 @@ class PoissonDist(Distribution):
         -------
         self
         """
-        super().__init__(name="poisson", scale=1.0)
+        super().__init__(scale=1.0)
         self._exclude.append("scale")
 
     def log_pdf(self, y, mu, weights=None):
@@ -454,6 +457,8 @@ class GammaDist(Distribution):
     Gamma Distribution
     """
 
+    name = "gamma"
+
     def __init__(self, scale=None):
         """
         creates an instance of the GammaDist class
@@ -467,7 +472,7 @@ class GammaDist(Distribution):
         -------
         self
         """
-        super().__init__(name="gamma", scale=scale)
+        super().__init__(scale=scale)
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -564,6 +569,8 @@ class InvGaussDist(Distribution):
     Inverse Gaussian (Wald) Distribution
     """
 
+    name = "inv_gauss"
+
     def __init__(self, scale=None):
         """
         creates an instance of the InvGaussDist class
@@ -577,7 +584,7 @@ class InvGaussDist(Distribution):
         -------
         self
         """
-        super().__init__(name="inv_gauss", scale=scale)
+        super().__init__(scale=scale)
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -664,9 +671,12 @@ class InvGaussDist(Distribution):
 
 
 DISTRIBUTIONS = {
-    "normal": NormalDist,
-    "poisson": PoissonDist,
-    "binomial": BinomialDist,
-    "gamma": GammaDist,
-    "inv_gauss": InvGaussDist,
+    dist.name: dist
+    for dist in [
+        NormalDist,
+        PoissonDist,
+        BinomialDist,
+        GammaDist,
+        InvGaussDist,
+    ]
 }
