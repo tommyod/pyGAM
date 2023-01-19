@@ -422,7 +422,6 @@ class Intercept(Term):
         )
 
         self._exclude += ["fit_splines", "fit_linear", "lam", "penalties", "constraints", "feature", "dtype"]
-        self._args = []
 
     def __repr__(self):
         return self._minimal_name
@@ -1643,11 +1642,7 @@ class TermList(Core, MetaTermMixin):
         for term in self._terms:
             term.compile(X, verbose=verbose)
 
-        # now remove duplicate intercepts
-        n_intercepts = 0
-        for term in self._terms:
-            if term.isintercept:
-                n_intercepts += 1
+        # TODO: remove duplicate intercepts
         return self
 
     def pop(self, index=-1):

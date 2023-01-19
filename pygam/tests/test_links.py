@@ -8,22 +8,22 @@ from pygam.distributions import BinomialDist
 
 
 class TestLink:
-    @pytest.mark.parametrize("linkname,link", LINKS.items())
-    def test_that_links_are_inverses_link_mu(self, linkname, link):
+    @pytest.mark.parametrize("link", LINKS.values())
+    def test_that_links_are_inverses_link_mu(self, link):
 
         argument = np.random.rand(100)
         dist = BinomialDist(levels=1)
         assert np.allclose(link().mu(link().link(argument, dist), dist), argument)
 
-    @pytest.mark.parametrize("linkname,link", LINKS.items())
-    def test_that_links_are_inverses_mu_link(self, linkname, link):
+    @pytest.mark.parametrize("link", LINKS.values())
+    def test_that_links_are_inverses_mu_link(self, link):
 
         argument = np.random.rand(100)
         dist = BinomialDist(levels=1)
         assert np.allclose(link().link(link().mu(argument, dist), dist), argument)
 
-    @pytest.mark.parametrize("linkname,link", LINKS.items())
-    def test_that_links_derivatives_are_close_to_finite_differences(self, linkname, link):
+    @pytest.mark.parametrize("link", LINKS.values())
+    def test_that_links_derivatives_are_close_to_finite_differences(self, link):
 
         argument = np.random.rand(100)
         dist = BinomialDist(levels=1)
