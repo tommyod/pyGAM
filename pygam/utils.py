@@ -589,15 +589,18 @@ def b_spline_basis(x, edge_knots, n_splines=20, spline_order=3, sparse=True, per
 
     print(x, edge_knots, n_splines, spline_order, sparse, periodic, verbose)
 
+    # n_splines=n_knots + degree - 1 (n_knots - 1 for extrapolation="periodic")
+    # n_knots=n_splines + degree - 1 (n_knots - 1 for extrapolation="periodic")
+
     # Add edge knots
     low_edge, high_edge = edge_knots
     # x_transformed = x[(x >= low_edge) & (x <= high_edge)]
     # x_transformed = np.hstack((x_transformed, edge_knots)).reshape(-1, 1)
 
-    n_knots = n_splines + 1 if periodic else n_splines - 2
+    # n_knots = n_splines + 1 if periodic else n_splines - 2
 
     transformer = SplineTransformer(
-        n_knots=n_knots,
+        n_knots=n_splines + spline_order - 1 - (1 if periodic else 0),
         degree=spline_order,
         knots="uniform",
         extrapolation="periodic" if periodic else "linear",
