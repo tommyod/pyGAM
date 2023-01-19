@@ -9,6 +9,7 @@ import numpy as np
 import scipy as sp
 
 from pygam.core import Core
+from sklearn.utils import check_X_y
 
 from pygam.penalties import derivative
 from pygam.penalties import l2
@@ -46,7 +47,6 @@ from pygam.callbacks import CALLBACKS
 
 from pygam.utils import check_y
 from pygam.utils import check_X
-from pygam.utils import check_X_y
 from pygam.utils import make_2d
 from pygam.utils import flatten
 from pygam.utils import check_array
@@ -107,7 +107,6 @@ __all__ = [
     "CALLBACKS",
     "check_y",
     "check_X",
-    "check_X_y",
     "make_2d",
     "flatten",
     "check_array",
@@ -845,7 +844,7 @@ class GAM(Core, MetaTermMixin):
                 break
 
         # estimate statistics even if not converged
-        self._estimate_model_statistics(Y, modelmat, inner=None, BW=WB.T, B=B, weights=weights, U1=U1)
+        self._estimate_model_statistics(Y, modelmat, B=B, weights=weights, U1=U1)
         if diff < self.tol:
             return
 
@@ -1073,7 +1072,7 @@ class GAM(Core, MetaTermMixin):
         sign = np.sign(y - mu)
         return sign * self.distribution.deviance(y, mu, weights=weights, scaled=scaled) ** 0.5
 
-    def _estimate_model_statistics(self, y, modelmat, inner=None, BW=None, B=None, weights=None, U1=None):
+    def _estimate_model_statistics(self, y, modelmat, B=None, weights=None, U1=None):
         """
         method to compute all of the model statistics
 
@@ -1098,8 +1097,6 @@ class GAM(Core, MetaTermMixin):
           output data vector of shape (n_samples,)
         modelmat : array-like, default: None
             contains the spline basis for each feature evaluated at the input
-        inner : array of intermediate computations from naive optimization
-        BW : array of intermediate computations from either optimization
         B : array of intermediate computations from stable optimization
         weights : array-like shape (n_samples,) or None, default: None
             containing sample weights
@@ -2589,7 +2586,7 @@ class LogisticGAM(GAM):
 
         if mu is None:
             mu = self.predict_mu(X)
-        check_X_y(mu, y)
+
         return ((mu > 0.5).astype(int) == y).mean()
 
     def score(self, X, y):

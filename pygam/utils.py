@@ -10,6 +10,7 @@ import warnings
 import scipy as sp
 import numpy as np
 from numpy.linalg import LinAlgError
+import collections.abc
 
 try:
     from sksparse.cholmod import cholesky as spcholesky
@@ -306,23 +307,6 @@ def check_X(X, n_feats=None, min_samples=1, edge_knots=None, dtypes=None, featur
     return X
 
 
-def check_X_y(X, y):
-    """
-    tool to ensure input and output data have the same number of samples
-
-    Parameters
-    ----------
-    X : array-like
-    y : array-like
-
-    Returns
-    -------
-    None
-    """
-    if len(X) != len(y):
-        raise ValueError("Inconsistent input and output data shapes. " "found X: {} and y: {}".format(X.shape, y.shape))
-
-
 def check_lengths(*arrays):
     """
     tool to ensure input and output data have the same number of samples
@@ -382,9 +366,6 @@ def check_param(param, param_name, dtype, constraint=None, iterable=True, max_de
         raise TypeError(msg)
 
     # check iterable
-    if iterable:
-        if check_iterable_depth(param) > max_depth:
-            raise TypeError(msg)
     if (not iterable) and isiterable(param):
         raise TypeError(msg)
 
@@ -706,25 +687,6 @@ def b_spline_basis(x, edge_knots, n_splines=20, spline_order=3, sparse=True, per
     return bases
 
 
-def ylogydu(y, u):
-    """
-    tool to give desired output for the limit as y -> 0, which is 0
-
-    Parameters
-    ----------
-    y : array-like of len(n)
-    u : array-like of len(n)
-
-    Returns
-    -------
-    np.array len(n)
-    """
-    mask = np.atleast_1d(y) != 0.0
-    out = np.zeros_like(u)
-    out[mask] = y[mask] * np.log(y[mask] / u[mask])
-    return out
-
-
 def combine(*args):
     """
     tool to perform tree search via recursion
@@ -766,40 +728,13 @@ def isiterable(obj, reject_string=True):
     bool, if the object is itereable.
     """
 
-    iterable = hasattr(obj, "__len__")
+    # iterable = hasattr(obj, "__len__")
+    iterable = isinstance(obj, collections.abc.Sized)
 
     if reject_string:
         iterable = iterable and not isinstance(obj, str)
 
     return iterable
-
-
-def check_iterable_depth(obj, max_depth=100):
-    """find the maximum depth of nesting of the iterable
-
-    Parameters
-    ----------
-    obj : iterable
-    max_depth : int, default: 100
-        maximum depth beyond which we stop counting
-
-    Returns
-    -------
-    int
-    """
-
-    def find_iterables(obj):
-        iterables = []
-        for item in obj:
-            if isiterable(item):
-                iterables += list(item)
-        return iterables
-
-    depth = 0
-    while (depth < max_depth) and isiterable(obj) and len(obj) > 0:
-        depth += 1
-        obj = find_iterables(obj)
-    return depth
 
 
 def flatten(iterable):

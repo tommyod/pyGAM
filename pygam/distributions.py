@@ -10,7 +10,7 @@ import scipy as sp
 import numpy as np
 
 from pygam.core import Core
-from pygam.utils import ylogydu
+from scipy.special import rel_entr as ylogydu
 
 
 def multiply_weights(deviance):

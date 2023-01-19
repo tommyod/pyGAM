@@ -151,7 +151,7 @@ def test_pop_term_from_term_list():
 
     assert term_list_2.pop(0) == term_list[0]
 
-    with pytest.raises(ValueError):
+    with pytest.raises(IndexError):
         term_list_2.pop(1) == term_list[0]
 
 
