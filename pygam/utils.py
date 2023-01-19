@@ -6,6 +6,7 @@ from copy import deepcopy
 import numbers
 import sys
 import warnings
+from sklearn.preprocessing import SplineTransformer
 
 import scipy as sp
 import numpy as np
@@ -585,22 +586,8 @@ def b_spline_basis(x, edge_knots, n_splines=20, spline_order=3, sparse=True, per
     if (spline_order < 0) or not isinstance(spline_order, numbers.Integral):
         raise ValueError("spline_order must be int >= 1")
 
-    from sklearn.preprocessing import SplineTransformer
-
-    print(x, edge_knots, n_splines, spline_order, sparse, periodic, verbose)
-
-    # n_splines=n_knots + degree - 1 (n_knots - 1 for extrapolation="periodic")
-    # n_splines - degree + 1 =n_knots + degree - 1 (n_knots - 1 for extrapolation="periodic")
-
-    # n_knots=n_splines + degree - 1 (n_knots - 1 for extrapolation="periodic")
-
-    # Add edge knots
-    low_edge, high_edge = edge_knots
-    # x_transformed = x[(x >= low_edge) & (x <= high_edge)]
-    # x_transformed = np.hstack((x_transformed, edge_knots)).reshape(-1, 1)
-
-    # n_knots = n_splines + 1 if periodic else n_splines - 2
-
+    # Use sklearn here
+    # TODO: Support knots?
     transformer = SplineTransformer(
         n_knots=n_splines + 1 + (0 if periodic else -spline_order),
         degree=spline_order,
@@ -610,15 +597,11 @@ def b_spline_basis(x, edge_knots, n_splines=20, spline_order=3, sparse=True, per
         order="C",
     )
 
+    # Fit on edges to extrapolate properly
     transformer.fit((np.array(edge_knots)).reshape(-1, 1))
 
     bases = transformer.transform(x.reshape(-1, 1))
-
-    # bases = bases[:-2]  # Remove edge knots
-
-    assert bases.shape[0] == len(x)
-    print(bases.shape[1], n_splines)
-    assert bases.shape[1] == n_splines
+    assert bases.shape == (len(x), n_splines)
 
     if sparse:
         return sp.sparse.csc_matrix(bases)
