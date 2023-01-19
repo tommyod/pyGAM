@@ -2,7 +2,6 @@
 Pygam utilities
 """
 
-from copy import deepcopy
 import numbers
 import sys
 import warnings
