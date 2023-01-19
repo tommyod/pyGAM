@@ -63,6 +63,7 @@ def test_large_GAM(coal_X_y):
     """
     X = np.linspace(0, 100, 100000)
     y = X**2
+    X = X.reshape(-1, 1)
     gam = LinearGAM().fit(X, y)
     assert gam._is_fitted
 
@@ -354,7 +355,7 @@ def test_prediction_interval_unknown_scale():
     we test at a large sample limit, where the t distribution becomes normal
     """
     n = 1000000
-    X = np.linspace(0, 1, n)
+    X = np.linspace(0, 1, n).reshape(-1, 1)
     y = np.random.randn(n)
 
     gam_a = LinearGAM(terms=l(0)).fit(X, y)
@@ -379,6 +380,7 @@ def test_prediction_interval_known_scale():
     n = 1000000
     X = np.linspace(0, 1, n)
     y = np.random.randn(n)
+    X = X.reshape(-1, 1)
 
     gam_a = LinearGAM(terms=l(0), scale=1.0).fit(X, y)
     gam_b = LinearGAM(s(0, n_splines=4), scale=1.0).fit(X, y)

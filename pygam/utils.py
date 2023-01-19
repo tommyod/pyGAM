@@ -6,6 +6,8 @@ import numbers
 import sys
 import warnings
 from sklearn.preprocessing import SplineTransformer
+from sklearn.utils import check_array
+import pandas as pd
 
 import scipy as sp
 import numpy as np
@@ -121,80 +123,6 @@ def make_2d(array, verbose=True):
     return array
 
 
-def check_array(array, force_2d=False, n_feats=None, ndim=None, min_samples=1, name="Input data", verbose=True):
-    """
-    tool to perform basic data validation.
-    called by check_X and check_y.
-
-    ensures that data:
-    - is ndim dimensional
-    - contains float-compatible data-types
-    - has at least min_samples
-    - has n_feats
-    - is finite
-
-    Parameters
-    ----------
-    array : array-like
-    force_2d : boolean, default: False
-        whether to force a 2d array. Setting to True forces ndim = 2
-    n_feats : int, default: None
-              represents number of features that the array should have.
-              not enforced if n_feats is None.
-    ndim : int default: None
-        number of dimensions expected in the array
-    min_samples : int, default: 1
-    name : str, default: 'Input data'
-        name to use when referring to the array
-    verbose : bool, default: True
-        whether to print warnings
-
-    Returns
-    -------
-    array : validated array
-    """
-    # make array
-    if force_2d:
-        array = make_2d(array, verbose=verbose)
-        ndim = 2
-    else:
-        array = np.array(array)
-
-    # cast to float
-    dtype = array.dtype
-    if dtype.kind not in ["i", "f"]:
-        try:
-            array = array.astype("float")
-        except ValueError:
-            raise ValueError(
-                "{} must be type int or float, "
-                "but found type: {}\n"
-                "Try transforming data with a LabelEncoder first.".format(name, dtype.type)
-            )
-
-    # check finite
-    if not (np.isfinite(array).all()):
-        raise ValueError("{} must not contain Inf nor NaN".format(name))
-
-    # check ndim
-    if ndim is not None:
-        if array.ndim != ndim:
-            raise ValueError("{} must have {} dimensions. " "found shape {}".format(name, ndim, array.shape))
-
-    # check n_feats
-    if n_feats is not None:
-        m = array.shape[1]
-        if m != n_feats:
-            raise ValueError("{} must have {} features, " "but found {}".format(name, n_feats, m))
-
-    # minimum samples
-    n = array.shape[0]
-    if n < min_samples:
-        raise ValueError("{} should have at least {} samples, " "but found {}".format(name, min_samples, n))
-
-    return array
-
-
 def check_y(y, link, dist, min_samples=1, verbose=True):
     """
     tool to ensure that the targets:
@@ -217,8 +145,9 @@ def check_y(y, link, dist, min_samples=1, verbose=True):
     y : array containing validated y-data
     """
     y = np.ravel(y)
+    # assert y.ndim == 1
 
-    y = check_array(y, force_2d=False, min_samples=min_samples, ndim=1, name="y data", verbose=verbose)
+    y = check_array(y, ensure_2d=False, ensure_min_samples=min_samples, input_name="y data")
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -261,6 +190,7 @@ def check_X(X, n_feats=None, min_samples=1, edge_knots=None, dtypes=None, featur
     -------
     X : array with ndims == 2 containing validated X-data
     """
+
     # check all features are there
     if bool(features):
         features = flatten(features)
@@ -272,7 +202,8 @@ def check_X(X, n_feats=None, min_samples=1, edge_knots=None, dtypes=None, featur
         n_feats = max(n_feats, max_feat)
 
     # basic diagnostics
-    X = check_array(X, force_2d=True, n_feats=n_feats, min_samples=min_samples, name="X data", verbose=verbose)
+    to_check = X.values if isinstance(X, (pd.Series, pd.DataFrame)) else X
+    X = check_array(to_check, ensure_2d=False, ensure_min_samples=min_samples, input_name="X data")
 
     # check our categorical data has no new categories
     if (edge_knots is not None) and (dtypes is not None) and (features is not None):

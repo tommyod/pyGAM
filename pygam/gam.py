@@ -7,6 +7,7 @@ import warnings
 
 import numpy as np
 import scipy as sp
+import pandas as pd
 
 from pygam.core import Core
 from sklearn.utils import check_X_y
@@ -49,7 +50,7 @@ from pygam.utils import check_y
 from pygam.utils import check_X
 from pygam.utils import make_2d
 from pygam.utils import flatten
-from pygam.utils import check_array
+from sklearn.utils import check_array
 from pygam.utils import check_lengths
 from pygam.utils import load_diagonal
 from pygam.utils import TablePrinter
@@ -109,7 +110,6 @@ __all__ = [
     "check_X",
     "make_2d",
     "flatten",
-    "check_array",
     "check_lengths",
     "load_diagonal",
     "TablePrinter",
@@ -397,8 +397,8 @@ class GAM(Core, MetaTermMixin):
 
         if weights is not None:
             weights = np.array(weights).astype("f").ravel()
-            weights = check_array(weights, name="sample weights", ndim=1, verbose=self.verbose)
-            check_lengths(y, weights)
+            weights = check_array(weights, input_name="sample weights", ensure_2d=False)
+            assert len(y) == len(weights)
         else:
             weights = np.ones_like(y).astype("float64")
 
@@ -976,7 +976,7 @@ class GAM(Core, MetaTermMixin):
 
         if weights is not None:
             weights = np.array(weights).astype("f").ravel()
-            weights = check_array(weights, name="sample weights", ndim=1, verbose=self.verbose)
+            weights = check_array(weights, input_name="sample weights", ensure_2d=False)
             check_lengths(y, weights)
         else:
             weights = np.ones_like(y).astype("float64")
@@ -1063,7 +1063,7 @@ class GAM(Core, MetaTermMixin):
 
         if weights is not None:
             weights = np.array(weights).astype("f").ravel()
-            weights = check_array(weights, name="sample weights", ndim=1, verbose=self.verbose)
+            weights = check_array(weights, input_name="sample weights", ensure_2d=False)
             check_lengths(y, weights)
         else:
             weights = np.ones_like(y).astype("float64")
@@ -1917,7 +1917,10 @@ class GAM(Core, MetaTermMixin):
 
         y = check_y(y, self.link, self.distribution, verbose=self.verbose)
         X = check_X(X, verbose=self.verbose)
-        check_X_y(X, y)
+
+        X_to_check = X.values if isinstance(X, (pd.DataFrame, pd.Series)) else X
+        y_to_check = y.values if isinstance(y, (pd.DataFrame, pd.Series)) else y
+        check_X_y(X_to_check, y_to_check)
 
         # special checks if model not fitted
         if not self._is_fitted:
@@ -1925,7 +1928,7 @@ class GAM(Core, MetaTermMixin):
 
         if weights is not None:
             weights = np.array(weights).astype("f").ravel()
-            weights = check_array(weights, name="sample weights", ndim=1, verbose=self.verbose)
+            weights = check_array(weights, input_name="sample weights", ensure_2d=False)
             check_lengths(y, weights)
         else:
             weights = np.ones_like(y).astype("float64")
@@ -2785,7 +2788,7 @@ class PoissonGAM(GAM):
 
         if weights is not None:
             weights = np.array(weights).astype("f").ravel()
-            weights = check_array(weights, name="sample weights", ndim=1, verbose=self.verbose)
+            weights = check_array(weights, input_name="sample weights", ensure_2d=False)
             check_lengths(y, weights)
         else:
             weights = np.ones_like(y).astype("float64")
@@ -2818,7 +2821,7 @@ class PoissonGAM(GAM):
 
         if exposure is not None:
             exposure = np.array(exposure).astype("f").ravel()
-            exposure = check_array(exposure, name="sample exposure", ndim=1, verbose=self.verbose)
+            exposure = check_array(exposure, input_name="sample exposure", ensure_2d=False)
         else:
             exposure = np.ones_like(y.ravel()).astype("float64")
 
@@ -2831,7 +2834,7 @@ class PoissonGAM(GAM):
 
         if weights is not None:
             weights = np.array(weights).astype("f").ravel()
-            weights = check_array(weights, name="sample weights", ndim=1, verbose=self.verbose)
+            weights = check_array(weights, input_name="sample weights", ensure_2d=False)
         else:
             weights = np.ones_like(y).astype("float64")
         check_lengths(weights, exposure)
