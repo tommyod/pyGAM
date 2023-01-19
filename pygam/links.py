@@ -24,6 +24,22 @@ class Link(Core, metaclass=ABCMeta):
         # Gradient of the link function
         pass
 
+    def get_domain(self, dist):
+        """
+        tIdentify the domain of a given monotonic link function
+
+        Parameters
+        ----------
+        dist : Distribution object
+
+        Returns
+        -------
+        domain : list of length 2, representing the interval of the domain.
+        """
+        domain = np.array([-np.inf, -1, 0, 1, np.inf])
+        low, *_, high = domain[~np.isnan(self.link(domain, dist))]
+        return [low, high]
+
 
 class IdentityLink(Link):
 

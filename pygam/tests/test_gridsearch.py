@@ -200,6 +200,7 @@ def test_param_validation_order_REGRESSION():
     """
     X = np.arange(10)
     y = X**2
+    X = X.reshape(-1, 1)
 
     gam = GAM().gridsearch(X, y)
     assert gam._is_fitted
@@ -219,5 +220,5 @@ def test_gridsearch_works_on_Series_REGRESSION():
     assert gam._is_fitted
 
     # Series
-    gam = LinearGAM().gridsearch(X[0], y)
+    gam = LinearGAM().gridsearch(X[[0]], y)
     assert gam._is_fitted

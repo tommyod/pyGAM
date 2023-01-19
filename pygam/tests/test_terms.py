@@ -242,8 +242,8 @@ def test_cyclic_p_spline_periodicity(hepatitis_X_y):
     gam = LinearGAM(s(0, basis="cp")).fit(X, y)
 
     # check periodicity
-    left = gam.edge_knots_[0][1]
-    right = gam.edge_knots_[0][1]
+    left = np.asarray([[gam.edge_knots_[0][1]]])
+    right = np.asarray([[gam.edge_knots_[0][1]]])
     assert gam.predict(left) == gam.predict(right)
 
     # check extrapolation
@@ -257,8 +257,8 @@ def test_cyclic_p_spline_custom_period():
     """
 
     # define square wave
-    X = np.linspace(0, 1, 5000)
-    y = X > 0.5
+    X = np.linspace(0, 1, 5000).reshape(-1, 1)
+    y = (X > 0.5).ravel()
 
     # when modeling the full period, we get close with a periodic basis
     gam = LinearGAM(s(0, basis="cp", n_splines=4, spline_order=0)).fit(X, y)
