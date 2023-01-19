@@ -15,12 +15,13 @@ def test_lam_non_neg_array_like(cake_X_y):
     try:
         gam = LinearGAM(lam=-1).fit(X, y)
     except ValueError:
-        assert(True)
+        assert True
 
     try:
-        gam = LinearGAM(lam=['hi']).fit(X, y)
+        gam = LinearGAM(lam=["hi"]).fit(X, y)
     except ValueError:
-        assert(True)
+        assert True
+
 
 def test_penalties_must_be_or_contain_callable_or_auto(mcycle_X_y):
     """
@@ -29,11 +30,12 @@ def test_penalties_must_be_or_contain_callable_or_auto(mcycle_X_y):
     X, y = mcycle_X_y
 
     with pytest.raises(ValueError):
-        gam = LinearGAM(terms=s(0, penalties='continuous'))
+        gam = LinearGAM(terms=s(0, penalties="continuous"))
 
     # now do iterable
     with pytest.raises(ValueError):
-        gam = LinearGAM(s(0, penalties=['continuous']))
+        gam = LinearGAM(s(0, penalties=["continuous"]))
+
 
 def test_intercept(mcycle_X_y):
     """
@@ -42,6 +44,7 @@ def test_intercept(mcycle_X_y):
     X, y = mcycle_X_y
     gam = LinearGAM(terms=intercept)
     gam.fit(X, y)
+
 
 def test_require_one_term(mcycle_X_y):
     """
@@ -52,13 +55,15 @@ def test_require_one_term(mcycle_X_y):
     with pytest.raises(ValueError):
         gam.fit(X, y)
 
+
 def test_linear_regression(mcycle_X_y):
     """
     should be able to do linear regression
     """
     X, y = mcycle_X_y
     gam = LinearGAM(l(0)).fit(X, y)
-    assert(gam._is_fitted)
+    assert gam._is_fitted
+
 
 def test_compute_stats_even_if_not_enough_iters(default_X_y):
     """
@@ -66,7 +71,8 @@ def test_compute_stats_even_if_not_enough_iters(default_X_y):
     """
     X, y = default_X_y
     gam = LogisticGAM(max_iter=1).fit(X, y)
-    assert(hasattr(gam, 'statistics_'))
+    assert hasattr(gam, "statistics_")
+
 
 def test_easy_plural_arguments(wage_X_y):
     """
@@ -77,6 +83,7 @@ def test_easy_plural_arguments(wage_X_y):
     gam = LinearGAM(n_splines=10).fit(X, y)
     assert gam._is_fitted
     assert gam.n_splines == [10] * X.shape[1]
+
 
 class TestRegressions(object):
     def test_no_explicit_terms_custom_lambda(self, wage_X_y):
@@ -97,7 +104,7 @@ class TestRegressions(object):
         used to fail for n_splines of type np.int64, as returned by np.arange
         """
         X, y = mcycle_X_y
-        gam = LinearGAM(n_splines=np.arange(9,10)[0]).fit(X, y)
+        gam = LinearGAM(n_splines=np.arange(9, 10)[0]).fit(X, y)
         assert gam._is_fitted
 
 

@@ -2,7 +2,6 @@
 Distributions
 """
 
-from __future__ import division, absolute_import
 from functools import wraps
 from abc import ABCMeta
 from abc import abstractmethod
@@ -11,7 +10,7 @@ import scipy as sp
 import numpy as np
 
 from pygam.core import Core
-from pygam.utils import ylogydu
+from scipy.special import rel_entr as ylogydu
 
 
 def multiply_weights(deviance):
@@ -20,6 +19,7 @@ def multiply_weights(deviance):
         if weights is None:
             weights = np.ones_like(mu)
         return deviance(self, y, mu, **kwargs) * weights
+
     return multiplied
 
 
@@ -29,16 +29,16 @@ def divide_weights(V):
         if weights is None:
             weights = np.ones_like(mu)
         return V(self, mu, **kwargs) / weights
+
     return divided
 
 
-class Distribution(Core):
-    __metaclass__ = ABCMeta
+class Distribution(Core, metaclass=ABCMeta):
     """
     base distribution class
     """
 
-    def __init__(self, name=None, scale=None):
+    def __init__(self, scale=None):
         """
         creates an instance of the Distribution class
 
@@ -52,11 +52,11 @@ class Distribution(Core):
         -------
         self
         """
+        super().__init__()
         self.scale = scale
         self._known_scale = self.scale is not None
-        super(Distribution, self).__init__(name=name)
         if not self._known_scale:
-            self._exclude += ['scale']
+            self._exclude += ["scale"]
 
     def phi(self, y, mu, edof, weights):
         """
@@ -83,8 +83,8 @@ class Distribution(Core):
         if self._known_scale:
             return self.scale
         else:
-            return (np.sum(weights * self.V(mu)**-1 * (y - mu)**2) /
-                    (len(mu) - edof))
+            # V is defined by subclasses
+            return np.sum(weights * self.V(mu) ** -1 * (y - mu) ** 2) / (len(mu) - edof)
 
     @abstractmethod
     def sample(self, mu):
@@ -102,11 +102,18 @@ class Distribution(Core):
         """
         pass
 
+    @abstractmethod
+    def V(self, mu):
+        """glm Variance function."""
+        pass
+
 
 class NormalDist(Distribution):
     """
     Normal Distribution
     """
+
+    name = "normal"
 
     def __init__(self, scale=None):
         """
@@ -121,7 +128,7 @@ class NormalDist(Distribution):
         -------
         self
         """
-        super(NormalDist, self).__init__(name='normal', scale=scale)
+        super().__init__(scale=scale)
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -195,7 +202,7 @@ class NormalDist(Distribution):
         -------
         deviances : np.array of length n
         """
-        dev = (y - mu)**2
+        dev = (y - mu) ** 2
         if scaled:
             dev /= self.scale
         return dev
@@ -226,6 +233,8 @@ class BinomialDist(Distribution):
     Binomial Distribution
     """
 
+    name = "binomial"
+
     def __init__(self, levels=1):
         """
         creates an instance of the Binomial class
@@ -239,11 +248,9 @@ class BinomialDist(Distribution):
         -------
         self
         """
-        if levels is None:
-            levels = 1
-        self.levels = levels
-        super(BinomialDist, self).__init__(name='binomial', scale=1.)
-        self._exclude.append('scale')
+        self.levels = levels if levels else None
+        super().__init__(scale=1.0)
+        self._exclude.append("scale")
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -328,14 +335,15 @@ class BinomialDist(Distribution):
         """
         number_of_trials = self.levels
         success_probability = mu / number_of_trials
-        return np.random.binomial(n=number_of_trials, p=success_probability,
-                                  size=None)
+        return np.random.binomial(n=number_of_trials, p=success_probability, size=None)
 
 
 class PoissonDist(Distribution):
     """
     Poisson Distribution
     """
+
+    name = "poisson"
 
     def __init__(self):
         """
@@ -349,8 +357,8 @@ class PoissonDist(Distribution):
         -------
         self
         """
-        super(PoissonDist, self).__init__(name='poisson', scale=1.)
-        self._exclude.append('scale')
+        super().__init__(scale=1.0)
+        self._exclude.append("scale")
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -449,6 +457,8 @@ class GammaDist(Distribution):
     Gamma Distribution
     """
 
+    name = "gamma"
+
     def __init__(self, scale=None):
         """
         creates an instance of the GammaDist class
@@ -462,7 +472,7 @@ class GammaDist(Distribution):
         -------
         self
         """
-        super(GammaDist, self).__init__(name='gamma', scale=scale)
+        super().__init__(scale=scale)
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -547,7 +557,7 @@ class GammaDist(Distribution):
         """
         # in numpy.random.gamma, `shape` is the parameter sometimes denoted by
         # `k` that corresponds to `nu` in S. Wood (2006) Table 2.1
-        shape = 1. / self.scale
+        shape = 1.0 / self.scale
         # in numpy.random.gamma, `scale` is the parameter sometimes denoted by
         # `theta` that corresponds to mu / nu in S. Wood (2006) Table 2.1
         scale = mu / shape
@@ -558,6 +568,8 @@ class InvGaussDist(Distribution):
     """
     Inverse Gaussian (Wald) Distribution
     """
+
+    name = "inv_gauss"
 
     def __init__(self, scale=None):
         """
@@ -572,7 +584,7 @@ class InvGaussDist(Distribution):
         -------
         self
         """
-        super(InvGaussDist, self).__init__(name='inv_gauss', scale=scale)
+        super().__init__(scale=scale)
 
     def log_pdf(self, y, mu, weights=None):
         """
@@ -595,7 +607,7 @@ class InvGaussDist(Distribution):
         if weights is None:
             weights = np.ones_like(mu)
         gamma = weights / self.scale
-        return sp.stats.invgauss.logpdf(y, mu, scale=1./gamma)
+        return sp.stats.invgauss.logpdf(y, mu, scale=1.0 / gamma)
 
     @divide_weights
     def V(self, mu):
@@ -636,7 +648,7 @@ class InvGaussDist(Distribution):
         -------
         deviances : np.array of length n
         """
-        dev = ((y - mu)**2) / (mu**2 * y)
+        dev = ((y - mu) ** 2) / (mu**2 * y)
 
         if scaled:
             dev /= self.scale
@@ -658,9 +670,13 @@ class InvGaussDist(Distribution):
         return np.random.wald(mean=mu, scale=self.scale, size=None)
 
 
-DISTRIBUTIONS = {'normal': NormalDist,
-                 'poisson': PoissonDist,
-                 'binomial': BinomialDist,
-                 'gamma': GammaDist,
-                 'inv_gauss': InvGaussDist
-                 }
+DISTRIBUTIONS = {
+    dist.name: dist
+    for dist in [
+        NormalDist,
+        PoissonDist,
+        BinomialDist,
+        GammaDist,
+        InvGaussDist,
+    ]
+}
