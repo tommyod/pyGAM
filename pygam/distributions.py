@@ -52,6 +52,7 @@ class Distribution(Core, metaclass=ABCMeta):
         -------
         self
         """
+        super().__init__()
         self.scale = scale
         self._known_scale = self.scale is not None
         if not self._known_scale:
