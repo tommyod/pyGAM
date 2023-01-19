@@ -706,25 +706,6 @@ def b_spline_basis(x, edge_knots, n_splines=20, spline_order=3, sparse=True, per
     return bases
 
 
-def ylogydu(y, u):
-    """
-    tool to give desired output for the limit as y -> 0, which is 0
-
-    Parameters
-    ----------
-    y : array-like of len(n)
-    u : array-like of len(n)
-
-    Returns
-    -------
-    np.array len(n)
-    """
-    mask = np.atleast_1d(y) != 0.0
-    out = np.zeros_like(u)
-    out[mask] = y[mask] * np.log(y[mask] / u[mask])
-    return out
-
-
 def combine(*args):
     """
     tool to perform tree search via recursion
