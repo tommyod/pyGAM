@@ -90,7 +90,7 @@ def test_check_y_not_in_domain_link(default_X_y, default_gam):
 def test_check_X_not_int_not_float():
     """X  must be an in or a float"""
     with pytest.raises(ValueError):
-        check_X(["hi"], verbose=False)
+        check_X(["hi"])
 
 
 def test_check_X_too_many_dims():
@@ -101,7 +101,7 @@ def test_check_X_too_many_dims():
 
 def test_check_X_not_min_samples():
     with pytest.raises(ValueError):
-        check_X(np.ones((5)), min_samples=6, verbose=False)
+        check_X(np.ones((5)), min_samples=6)
 
 
 def test_input_data_after_fitting(mcycle_X_y):

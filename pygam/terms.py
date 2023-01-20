@@ -564,7 +564,7 @@ class LinearTerm(Term):
                 "term requires feature {}, " "but X has only {} dimensions".format(self.feature, X.shape[1])
             )
 
-        self.edge_knots_ = gen_edge_knots(X[:, self.feature], self.dtype, verbose=verbose)
+        self.edge_knots_ = gen_edge_knots(X[:, self.feature], self.dtype)
         return self
 
     def build_columns(self, X, verbose=False):
@@ -781,7 +781,7 @@ class SplineTerm(Term):
             )
 
         if not hasattr(self, "edge_knots_"):
-            self.edge_knots_ = gen_edge_knots(X[:, self.feature], self.dtype, verbose=verbose)
+            self.edge_knots_ = gen_edge_knots(X[:, self.feature], self.dtype)
         return self
 
     def build_columns(self, X, verbose=False):
@@ -808,7 +808,6 @@ class SplineTerm(Term):
             n_splines=self.n_splines,
             sparse=True,
             periodic=self.basis in ["cp"],
-            verbose=verbose,
         )
 
         if self.by is not None:
@@ -919,7 +918,7 @@ class FactorTerm(SplineTerm):
         super().compile(X)
 
         self.n_splines = len(np.unique(X[:, self.feature]))
-        self.edge_knots_ = gen_edge_knots(X[:, self.feature], self.dtype, verbose=verbose)
+        self.edge_knots_ = gen_edge_knots(X[:, self.feature], self.dtype)
         return self
 
     def build_columns(self, X, verbose=False):

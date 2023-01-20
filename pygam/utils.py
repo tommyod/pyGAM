@@ -36,7 +36,7 @@ class OptimizationError(ValueError):
     """Exception class to raise if PIRLS optimization fails"""
 
 
-def cholesky(A, sparse=True, verbose=True):
+def cholesky(A, sparse=True):
     """
     Choose the best possible cholesky factorizor.
 
@@ -51,8 +51,6 @@ def cholesky(A, sparse=True, verbose=True):
         array to decompose
     sparse : boolean, default: True
         whether to return a sparse array
-    verbose : bool, default: True
-        whether to print warnings
     """
     if SKSPIMPORT:
         logger.info("Cholesky decomposition with scikit-sparse")
@@ -83,8 +81,7 @@ def cholesky(A, sparse=True, verbose=True):
             "See installation instructions for installing "
             "Scikit-Sparse and Suite-Sparse via Conda."
         )
-        if verbose:
-            warnings.warn(msg)
+        warnings.warn(msg)
 
         if sp.sparse.issparse(A):
             A = A.A
@@ -162,7 +159,7 @@ def check_y(y, link, dist, min_samples=1, verbose=True):
     return y
 
 
-def check_X(X, n_feats=None, min_samples=1, edge_knots=None, dtypes=None, features=None, verbose=True):
+def check_X(X, n_feats=None, min_samples=1, edge_knots=None, dtypes=None, features=None):
     """
     tool to ensure that X:
     - is 2 dimensional
@@ -183,8 +180,6 @@ def check_X(X, n_feats=None, min_samples=1, edge_knots=None, dtypes=None, featur
     dtypes : list of strings, default: None
     features : list of ints,
         which features are considered by the model
-    verbose : bool, default: True
-        whether to print warnings
 
     Returns
     -------
@@ -434,7 +429,7 @@ def sig_code(p_value):
     return " "
 
 
-def gen_edge_knots(data, dtype, verbose=True):
+def gen_edge_knots(data, dtype):
     """
     generate uniform knots from data including the edges of the data
 
@@ -444,8 +439,6 @@ def gen_edge_knots(data, dtype, verbose=True):
     ----------
     data : array-like with one dimension
     dtype : str in {'categorical', 'numerical'}
-    verbose : bool, default: True
-        whether to print warnings
 
     Returns
     -------
@@ -457,14 +450,14 @@ def gen_edge_knots(data, dtype, verbose=True):
         return np.r_[np.min(data) - 0.5, np.max(data) + 0.5]
     else:
         knots = np.r_[np.min(data), np.max(data)]
-        if knots[0] == knots[1] and verbose:
+        if knots[0] == knots[1]:
             warnings.warn(
                 "Data contains constant feature. " "Consider removing and setting fit_intercept=True", stacklevel=2
             )
         return knots
 
 
-def b_spline_basis(x, edge_knots, n_splines=20, spline_order=3, sparse=True, periodic=True, verbose=True):
+def b_spline_basis(x, edge_knots, n_splines=20, spline_order=3, sparse=True, periodic=True):
     """
     tool to generate b-spline basis using vectorized De Boor recursion
     the basis functions extrapolate linearly past the end-knots.
@@ -481,8 +474,6 @@ def b_spline_basis(x, edge_knots, n_splines=20, spline_order=3, sparse=True, per
              default: True
     periodic: bool, default: True
         whether to repeat basis functions (True) or linearly extrapolate (False).
-    verbose : bool, default: True
-        whether to print warnings
 
     Returns
     -------

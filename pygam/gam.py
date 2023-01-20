@@ -392,7 +392,7 @@ class GAM(Core, MetaTermMixin):
         log-likelihood : np.array of shape (n,)
             containing log-likelihood scores
         """
-        y = check_y(y, self.link, self.distribution, verbose=self.verbose)
+        y = check_y(y, self.link, self.distribution)
         mu = self.predict_mu(X)
 
         if weights is not None:
@@ -485,7 +485,6 @@ class GAM(Core, MetaTermMixin):
             edge_knots=self.edge_knots_,
             dtypes=self.dtype,
             features=self.feature,
-            verbose=self.verbose,
         )
 
         lp = self._linear_predictor(X)
@@ -533,7 +532,6 @@ class GAM(Core, MetaTermMixin):
             edge_knots=self.edge_knots_,
             dtypes=self.dtype,
             features=self.feature,
-            verbose=self.verbose,
         )
 
         return self.terms.build_columns(X, term=term)
@@ -736,7 +734,7 @@ class GAM(Core, MetaTermMixin):
         y[y == 1] -= 0.01  # edge case for logit link
 
         y_ = self.link.link(y, self.distribution)
-        y_ = make_2d(y_, verbose=False)
+        y_ = make_2d(y_)
         assert np.isfinite(y_).all(), "transformed response values should be well-behaved."
 
         # solve the linear problem
@@ -779,7 +777,7 @@ class GAM(Core, MetaTermMixin):
 
         # if we dont have any constraints, then do cholesky now
         if not self.terms.hasconstraint:
-            E = self._cholesky(S + P, sparse=False, verbose=self.verbose)
+            E = self._cholesky(S + P, sparse=False)
 
         min_n_m = np.min([m, n])
         Dinv = np.zeros((min_n_m + m, m)).T
@@ -791,7 +789,7 @@ class GAM(Core, MetaTermMixin):
             if self.terms.hasconstraint:
                 P = self._P()
                 C = self._C()
-                E = self._cholesky(S + P + C, sparse=False, verbose=self.verbose)
+                E = self._cholesky(S + P + C, sparse=False)
 
             # forward pass
             y = deepcopy(Y)  # for simplicity
@@ -970,8 +968,8 @@ class GAM(Core, MetaTermMixin):
         self._validate_params()
 
         # validate data
-        y = check_y(y, self.link, self.distribution, verbose=self.verbose)
-        X = check_X(X, verbose=self.verbose)
+        y = check_y(y, self.link, self.distribution)
+        X = check_X(X)
         check_X_y(X, y)
 
         if weights is not None:
@@ -1050,14 +1048,13 @@ class GAM(Core, MetaTermMixin):
         if not self._is_fitted:
             raise AttributeError("GAM has not been fitted. Call fit first.")
 
-        y = check_y(y, self.link, self.distribution, verbose=self.verbose)
+        y = check_y(y, self.link, self.distribution)
         X = check_X(
             X,
             n_feats=self.statistics_["m_features"],
             edge_knots=self.edge_knots_,
             dtypes=self.dtype,
             features=self.feature,
-            verbose=self.verbose,
         )
         check_X_y(X, y)
 
@@ -1381,7 +1378,6 @@ class GAM(Core, MetaTermMixin):
             edge_knots=self.edge_knots_,
             dtypes=self.dtype,
             features=self.feature,
-            verbose=self.verbose,
         )
 
         return self._get_quantiles(X, width, quantiles, prediction=False)
@@ -1639,7 +1635,6 @@ class GAM(Core, MetaTermMixin):
                 edge_knots=self.edge_knots_,
                 dtypes=self.dtype,
                 features=self.feature,
-                verbose=self.verbose,
             )
 
         modelmat = self._modelmat(X, term=term)
@@ -1915,8 +1910,8 @@ class GAM(Core, MetaTermMixin):
         if not self._is_fitted:
             self._validate_params()
 
-        y = check_y(y, self.link, self.distribution, verbose=self.verbose)
-        X = check_X(X, verbose=self.verbose)
+        y = check_y(y, self.link, self.distribution)
+        X = check_X(X)
 
         X_to_check = X.values if isinstance(X, (pd.DataFrame, pd.Series)) else X
         y_to_check = y.values if isinstance(y, (pd.DataFrame, pd.Series)) else y
@@ -2460,7 +2455,6 @@ class LinearGAM(GAM):
             edge_knots=self.edge_knots_,
             dtypes=self.dtype,
             features=self.feature,
-            verbose=self.verbose,
         )
 
         return self._get_quantiles(X, width, quantiles, prediction=True)
@@ -2579,7 +2573,7 @@ class LogisticGAM(GAM):
         if not self._is_fitted:
             raise AttributeError("GAM has not been fitted. Call fit first.")
 
-        y = check_y(y, self.link, self.distribution, verbose=self.verbose)
+        y = check_y(y, self.link, self.distribution)
         if X is not None:
             X = check_X(
                 X,
@@ -2587,7 +2581,6 @@ class LogisticGAM(GAM):
                 edge_knots=self.edge_knots_,
                 dtypes=self.dtype,
                 features=self.feature,
-                verbose=self.verbose,
             )
 
         if mu is None:
@@ -2786,7 +2779,7 @@ class PoissonGAM(GAM):
         log-likelihood : np.array of shape (n,)
             containing log-likelihood scores
         """
-        y = check_y(y, self.link, self.distribution, verbose=self.verbose)
+        y = check_y(y, self.link, self.distribution)
         mu = self.predict_mu(X)
 
         if weights is not None:
@@ -2907,7 +2900,6 @@ class PoissonGAM(GAM):
             edge_knots=self.edge_knots_,
             dtypes=self.dtype,
             features=self.feature,
-            verbose=self.verbose,
         )
 
         if exposure is not None:
