@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from pygam import *
-from pygam.terms import Term, Intercept, SplineTerm, LinearTerm, FactorTerm, TensorTerm, TermList
+from pygam.terms import FactorTerm, Intercept, LinearTerm, SplineTerm, TensorTerm, Term, TermList
 from pygam.utils import flatten
 
 

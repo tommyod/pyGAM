@@ -2,26 +2,16 @@
 Pygam utilities
 """
 
+import collections.abc
 import numbers
 import sys
 import warnings
+
+import numpy as np
+import pandas as pd
+import scipy as sp
 from sklearn.preprocessing import SplineTransformer
 from sklearn.utils import check_array
-import pandas as pd
-
-import scipy as sp
-import numpy as np
-from numpy.linalg import LinAlgError
-import collections.abc
-
-try:
-    from sksparse.cholmod import cholesky as spcholesky
-    from sksparse.test_cholmod import CholmodNotPositiveDefiniteError
-
-    SKSPIMPORT = True
-except ImportError:
-    SKSPIMPORT = False
-
 
 from pygam.log import setup_custom_logger
 
@@ -34,66 +24,6 @@ class NotPositiveDefiniteError(ValueError):
 
 class OptimizationError(ValueError):
     """Exception class to raise if PIRLS optimization fails"""
-
-
-def cholesky(A, sparse=True):
-    """
-    Choose the best possible cholesky factorizor.
-
-    if possible, import the Scikit-Sparse sparse Cholesky method.
-    Permutes the output L to ensure A = L.H . L
-
-    otherwise defaults to numpy's non-sparse version
-
-    Parameters
-    ----------
-    A : array-like
-        array to decompose
-    sparse : boolean, default: True
-        whether to return a sparse array
-    """
-    if SKSPIMPORT:
-        logger.info("Cholesky decomposition with scikit-sparse")
-        A = sp.sparse.csc_matrix(A)
-        try:
-            F = spcholesky(A)
-
-            # permutation matrix P
-            P = sp.sparse.lil_matrix(A.shape)
-            p = F.P()
-            P[np.arange(len(p)), p] = 1
-
-            # permute
-            L = F.L()
-            L = P.T.dot(L)
-        except CholmodNotPositiveDefiniteError:
-            raise NotPositiveDefiniteError("Matrix is not positive definite")
-
-        if sparse:
-            return L.T  # upper triangular factorization
-        return L.T.A  # upper triangular factorization
-
-    else:
-        msg = (
-            "Could not import Scikit-Sparse or Suite-Sparse.\n"
-            "This will slow down optimization for models with "
-            "monotonicity/convexity penalties and many splines.\n"
-            "See installation instructions for installing "
-            "Scikit-Sparse and Suite-Sparse via Conda."
-        )
-        warnings.warn(msg)
-
-        if sp.sparse.issparse(A):
-            A = A.A
-
-        try:
-            L = sp.linalg.cholesky(A, lower=False)
-        except LinAlgError:
-            raise NotPositiveDefiniteError("Matrix is not positive definite")
-
-        if sparse:
-            return sp.sparse.csc_matrix(L)
-        return L
 
 
 def make_2d(array, verbose=True):

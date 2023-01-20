@@ -1,18 +1,17 @@
 """
 Link functions
 """
-from abc import ABCMeta
-from abc import abstractmethod, abstractproperty
-from collections import defaultdict
 import warnings
+from abc import ABCMeta, abstractmethod, abstractproperty
+from collections import defaultdict
 from copy import deepcopy
 
 import numpy as np
 import scipy as sp
 
 from pygam.core import Core, nice_repr
-from pygam.utils import isiterable, check_param, flatten, gen_edge_knots, b_spline_basis, tensor_product
-from pygam.penalties import PENALTIES, CONSTRAINTS
+from pygam.penalties import CONSTRAINTS, PENALTIES
+from pygam.utils import b_spline_basis, check_param, flatten, gen_edge_knots, isiterable, tensor_product
 
 
 class Term(Core):

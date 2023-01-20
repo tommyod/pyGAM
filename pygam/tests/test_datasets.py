@@ -3,18 +3,8 @@
 import numpy as np
 import pytest
 
-from pygam.datasets import cake
-from pygam.datasets import coal
-from pygam.datasets import default
-from pygam.datasets import faithful
-from pygam.datasets import hepatitis
-from pygam.datasets import mcycle
-from pygam.datasets import trees
-from pygam.datasets import wage
-from pygam.datasets import chicago
-from pygam.datasets import toy_interaction
-
 from pygam.datasets import __all__ as DATASETS
+from pygam.datasets import cake, chicago, coal, default, faithful, hepatitis, mcycle, toy_interaction, trees, wage
 
 
 def _test_dataset(dataset_loader, n_rows, n_columns_X, n_columns_df, n_rows_X=None):

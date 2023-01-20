@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import sys
+from io import StringIO
 
 import numpy as np
 import pytest
 import scipy as sp
-from io import StringIO
 
 from pygam import *
 

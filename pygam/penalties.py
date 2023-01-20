@@ -2,9 +2,10 @@
 Penalty matrix generators
 """
 
-import scipy as sp
-import numpy as np
 import warnings
+
+import numpy as np
+import scipy as sp
 
 
 def derivative(n, coef, derivative=2, periodic=False):

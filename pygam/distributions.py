@@ -2,15 +2,14 @@
 Distributions
 """
 
+from abc import ABCMeta, abstractmethod
 from functools import wraps
-from abc import ABCMeta
-from abc import abstractmethod
 
-import scipy as sp
 import numpy as np
+import scipy as sp
+from scipy.special import rel_entr as ylogydu
 
 from pygam.core import Core
-from scipy.special import rel_entr as ylogydu
 
 
 def multiply_weights(deviance):

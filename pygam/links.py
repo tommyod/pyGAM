@@ -1,10 +1,11 @@
 """
 Link functions
 """
+from abc import ABCMeta, abstractmethod
+
 import numpy as np
 from scipy import special
 
-from abc import ABCMeta, abstractmethod
 from pygam.core import Core
 
 

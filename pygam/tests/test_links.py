@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from pygam.links import LINKS
 from pygam.distributions import BinomialDist
+from pygam.links import LINKS
 
 
 class TestLink:

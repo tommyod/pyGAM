@@ -1,24 +1,23 @@
 # -*- coding: utf-8 -*-
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 
 from pygam import *
 from pygam.datasets import (
-    mcycle,
-    coal,
-    faithful,
     cake,
+    chicago,
     coal,
     default,
-    trees,
-    hepatitis,
-    wage,
-    toy_classification,
+    faithful,
     head_circumference,
-    chicago,
+    hepatitis,
+    mcycle,
+    toy_classification,
     toy_interaction,
+    trees,
+    wage,
 )
 
 

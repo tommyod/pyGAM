@@ -2,19 +2,8 @@
 GAM toolkit
 """
 
-from pygam.gam import GAM
-from pygam.gam import LinearGAM
-from pygam.gam import LogisticGAM
-from pygam.gam import GammaGAM
-from pygam.gam import PoissonGAM
-from pygam.gam import InvGaussGAM
-from pygam.gam import ExpectileGAM
-
-from pygam.terms import l
-from pygam.terms import s
-from pygam.terms import f
-from pygam.terms import te
-from pygam.terms import intercept
+from pygam.gam import GAM, ExpectileGAM, GammaGAM, InvGaussGAM, LinearGAM, LogisticGAM, PoissonGAM
+from pygam.terms import f, intercept, l, s, te
 
 __all__ = [
     "GAM",

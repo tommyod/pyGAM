@@ -15,7 +15,6 @@ import pytest
 from pygam import *
 from pygam.utils import check_X, check_y, sig_code
 
-
 # TODO check dtypes works as expected
 # TODO checkX, checky, check XY expand as needed, call out bad domain
 
@@ -217,7 +216,7 @@ def test_b_spline_basis_extrapolates(mcycle_X_y):
 
 def test_no_SKSPIMPORT(mcycle_X_y):
     """make sure our module work with and without scikit-sparse"""
-    from pygam.utils import SKSPIMPORT
+    from pygam.optimization import SKSPIMPORT
 
     if SKSPIMPORT:
         with patch("pygam.utils.SKSPIMPORT", new=False) as SKSPIMPORT_patch:
