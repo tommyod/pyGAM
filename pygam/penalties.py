@@ -10,7 +10,7 @@ import functools
 
 
 class FDMatrix:
-    """Finite differene matrix."""
+    """Finite differene matrices."""
 
     @staticmethod
     def forward_diff(n, periodic=True):
@@ -118,6 +118,14 @@ class FDMatrix:
             D[0, :2] = [-1.0, 1.0]  # Use forward difference for first element
             D[-1, -2:] = [-1.0, 1.0]  # Use backward difference for last element
             return D
+        
+        
+    @classmethod
+    def derivative(cls, n, order=1, periodic=True):
+        D = cls.centered_diff(n, periodic)
+        return np.linalg.matrix_power(D, n=order)
+        
+        
 
 
 # =============================================================================
@@ -147,6 +155,10 @@ def derivative(n, coef, derivative=2, periodic=False):
     -------
     penalty matrix : sparse csc matrix of shape (n,n)
     """
+    
+    # return FDMatrix.derivative(n, order=derivative, periodic=periodic)
+
+    
     if n == 1:
         # no derivative for constant functions
         return sp.sparse.csc_matrix(0.0)
@@ -163,10 +175,14 @@ def derivative(n, coef, derivative=2, periodic=False):
 
         # keep only the center of the augmented matrix
         D = D[derivative:-derivative, derivative:-derivative]
+        
+    # print(f"Shape of D: {D.shape}")
     return D.dot(D.T).tocsc()
 
 
 def periodic(n, coef, derivative=2, _penalty=derivative):
+    # return FDMatrix.derivative(n, order=derivative, periodic=True)
+    
     return _penalty(n, coef, derivative=derivative, periodic=True)
 
 
@@ -195,12 +211,37 @@ def l2(n, coef):
 # =============================================================================
 
 
-def monotonic_inc(n, coef):
+def monotonic_inc(n, coef):    
     return monotonicity_(n, coef, increasing=True)
+
+    coef= coef.ravel()
+    # For an array   [1, 4,  3,  2, 5]
+    # the penalty is [0, 0, -1, -1, 0]
+    # and this encourages elements corresponding to 3 and 2 to grow
+    # in the minimization problem
+    D = FDMatrix.backward_diff(n, periodic=False)
+    mask = np.diff(coef) > 0
+    print(coef, coef.shape)
+    mask = np.hstack(([True], mask))
+    D[mask, :] = 0
+    return D
 
 
 def monotonic_dec(n, coef):
     return monotonicity_(n, coef, increasing=False)
+
+    coef= coef.ravel()
+    # For an array   [ 1, 4, 3,  2, 5]
+    # the penalty is [-3, 0, 0, -3, 0]
+    # and this encourages elements corresponding to 3 and 2 to grow
+    # in the minimization problem
+    
+    # equals to -monotonic_inc(5, a[::-1]) @ a
+    D = FDMatrix.forward_diff(n, periodic=False)
+    mask = np.diff(coef) < 0
+    mask = np.hstack((mask, [True]))
+    D[mask, :] = 0
+    return -D
 
 
 def monotonicity_(n, coef, increasing=True):
@@ -220,6 +261,7 @@ def monotonicity_(n, coef, increasing=True):
     -------
     penalty matrix : sparse csc matrix of shape (n,n)
     """
+    
     if n != len(coef.ravel()):
         raise ValueError(
             "dimension mismatch: expected n equals len(coef), "
@@ -239,6 +281,7 @@ def monotonicity_(n, coef, increasing=True):
 
     derivative = 1
     D = sparse_diff(sp.sparse.identity(n).tocsc(), n=derivative) * mask
+    # print(f"Shape of D: {D.shape}")
     return D.dot(D.T).tocsc()
 
 
@@ -276,6 +319,7 @@ def convexity_(n, coef, convex=True):
 
     derivative = 2
     D = sparse_diff(sp.sparse.identity(n).tocsc(), n=derivative) * mask
+    # print(f"Shape of D: {D.shape}")
     return D.dot(D.T).tocsc()
 
 
