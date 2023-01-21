@@ -617,6 +617,7 @@ class GAM(Core, MetaTermMixin):
         -------
         weights : sp..sparse array of shape (n_samples, n_samples)
         """
+        # Section 6.1.1, list entry (2) in Wood
         return sp.sparse.diags(
             (self.link.gradient(mu, self.distribution) ** 2 * self.distribution.V(mu=mu) * weights**-1) ** -0.5
         )
@@ -700,6 +701,10 @@ class GAM(Core, MetaTermMixin):
         """
         Performs stable PIRLS iterations to estimate GAM coefficients
 
+        https://www.jstor.org/stable/20203839
+        section 6.1.1 in Wood on PIRLS   (p251)
+        section 3.1.2 in Wood on fitting (p107)
+
         Parameters
         ---------
         X : array-like of shape (n_samples, m_features)
@@ -775,7 +780,8 @@ class GAM(Core, MetaTermMixin):
             self._on_loop_start(vars())
 
             WB = W.dot(modelmat[mask, :])  # common matrix product
-            Q, R = np.linalg.qr(WB.A)
+
+            Q, R = np.linalg.qr(WB.A)  # 'A' transforms scipy.sparse._csr.csr_matrix -> numpy.ndarray
 
             if not np.isfinite(Q).all() or not np.isfinite(R).all():
                 raise ValueError("QR decomposition produced NaN or Inf. " "Check X data.")
@@ -926,7 +932,6 @@ class GAM(Core, MetaTermMixin):
             Returns fitted GAM object
         """
         logger.info("Created GAM instance")
-        print("fit")
 
         # validate parameters
         self._validate_params()
