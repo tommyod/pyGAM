@@ -16,9 +16,7 @@ from pygam.penalties import CONSTRAINTS, PENALTIES
 from pygam.utils import b_spline_basis, check_param, flatten, gen_edge_knots, isiterable, tensor_product
 
 
-class Term(Core):
-    __metaclass__ = ABCMeta
-
+class Term(Core, metaclass=ABCMeta):
     def __init__(
         self,
         feature,
@@ -913,7 +911,8 @@ class FactorTerm(SplineTerm):
         """
         super()._validate_arguments()
         if self.coding not in self._encodings:
-            raise ValueError("coding must be one of {}, " "but found: {}".format(self._encodings, self.coding))
+            msg = f"coding must be one of {self._encodings}, but found: {self.coding}"
+            raise ValueError(msg)
 
         return self
 
@@ -965,7 +964,7 @@ class FactorTerm(SplineTerm):
         return self.n_splines - 1 * (self.coding in ["dummy"])
 
 
-class MetaTermMixin(object):
+class MetaTermMixin:
     _plural = [
         "feature",
         "dtype",

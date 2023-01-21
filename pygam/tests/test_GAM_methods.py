@@ -271,7 +271,7 @@ def test_get_params():
     assert params["lam"] == 420
 
 
-class TestSamplingFromPosterior(object):
+class TestSamplingFromPosterior:
     def test_drawing_samples_from_unfitted_model(self, mcycle_X_y, mcycle_gam):
         X, y = mcycle_X_y
         gam = LinearGAM()
@@ -475,7 +475,7 @@ def test_fit_quantile_raises_ValueError(head_circumference_X_y):
         ExpectileGAM().fit_quantile(X, y, max_iter=-1, quantile=0.5)
 
 
-class TestRegressions(object):
+class TestRegressions:
     def test_pvalue_invariant_to_scale(self, wage_X_y):
         """
         regression test.

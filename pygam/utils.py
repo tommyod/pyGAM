@@ -274,7 +274,7 @@ def round_to_n_decimal_places(array, n=3):
 
 
 # Credit to Hugh Bothwell from http://stackoverflow.com/questions/5084743/how-to-print-pretty-string-output-in-python
-class TablePrinter(object):
+class TablePrinter:
     "Print a list of dicts as a table"
 
     def __init__(self, fmt, sep=" ", ul=None):

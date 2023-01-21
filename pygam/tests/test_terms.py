@@ -323,7 +323,7 @@ def test_tensor_with_constraints(hepatitis_X_y):
     assert gam_constrained.statistics_["pseudo_r2"]["explained_deviance"] < 0.1
 
 
-class TestRegressions(object):
+class TestRegressions:
     def test_no_auto_dtype(self):
         with pytest.raises(ValueError):
             SplineTerm(feature=0, dtype="auto")

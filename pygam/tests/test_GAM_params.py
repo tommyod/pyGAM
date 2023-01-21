@@ -85,7 +85,7 @@ def test_easy_plural_arguments(wage_X_y):
     assert gam.n_splines == [10] * X.shape[1]
 
 
-class TestRegressions(object):
+class TestRegressions:
     def test_no_explicit_terms_custom_lambda(self, wage_X_y):
         X, y = wage_X_y
 
