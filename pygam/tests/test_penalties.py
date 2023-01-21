@@ -4,15 +4,7 @@ import numpy as np
 import pytest
 
 from pygam import *
-
-from pygam.penalties import derivative
-from pygam.penalties import l2
-from pygam.penalties import monotonic_inc
-from pygam.penalties import monotonic_dec
-from pygam.penalties import convex
-from pygam.penalties import concave
-from pygam.penalties import none
-from pygam.penalties import wrap_penalty
+from pygam.penalties import concave, convex, derivative, l2, monotonic_dec, monotonic_inc, none, wrap_penalty
 
 
 def test_single_spline_penalty():

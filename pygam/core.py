@@ -4,7 +4,7 @@ Core classes
 
 import numpy as np
 
-from pygam.utils import round_to_n_decimal_places, flatten
+from pygam.utils import flatten, round_to_n_decimal_places
 
 
 def nice_repr(name, param_kvs, line_width=30, line_offset=5, decimals=3, args=None, flatten_attrs=True):

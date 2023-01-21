@@ -15,7 +15,6 @@ import pytest
 from pygam import *
 from pygam.utils import check_X, check_y, sig_code
 
-
 # TODO check dtypes works as expected
 # TODO checkX, checky, check XY expand as needed, call out bad domain
 
@@ -90,7 +89,7 @@ def test_check_y_not_in_domain_link(default_X_y, default_gam):
 def test_check_X_not_int_not_float():
     """X  must be an in or a float"""
     with pytest.raises(ValueError):
-        check_X(["hi"], verbose=False)
+        check_X(["hi"])
 
 
 def test_check_X_too_many_dims():
@@ -101,7 +100,7 @@ def test_check_X_too_many_dims():
 
 def test_check_X_not_min_samples():
     with pytest.raises(ValueError):
-        check_X(np.ones((5)), min_samples=6, verbose=False)
+        check_X(np.ones((5)), min_samples=6)
 
 
 def test_input_data_after_fitting(mcycle_X_y):
@@ -217,7 +216,7 @@ def test_b_spline_basis_extrapolates(mcycle_X_y):
 
 def test_no_SKSPIMPORT(mcycle_X_y):
     """make sure our module work with and without scikit-sparse"""
-    from pygam.utils import SKSPIMPORT
+    from pygam.optimization import SKSPIMPORT
 
     if SKSPIMPORT:
         with patch("pygam.utils.SKSPIMPORT", new=False) as SKSPIMPORT_patch:

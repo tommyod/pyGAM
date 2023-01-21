@@ -1,78 +1,71 @@
 # -*- coding: utf-8 -*-
 
-from collections import defaultdict
-from collections import OrderedDict
+import warnings
+from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from itertools import product
-import warnings
 
 import numpy as np
-import scipy as sp
 import pandas as pd
+import scipy as sp
+from sklearn.utils import check_array, check_X_y
 
+from pygam.callbacks import CALLBACKS, Accuracy, CallBack, Coef, Deviance, Diffs, validate_callback
 from pygam.core import Core
-from sklearn.utils import check_X_y
-
-from pygam.penalties import derivative
-from pygam.penalties import l2
-from pygam.penalties import monotonic_inc
-from pygam.penalties import monotonic_dec
-from pygam.penalties import convex
-from pygam.penalties import concave
-from pygam.penalties import none
-from pygam.penalties import wrap_penalty
-from pygam.penalties import PENALTIES, CONSTRAINTS
-
-from pygam.distributions import Distribution
-from pygam.distributions import NormalDist
-from pygam.distributions import BinomialDist
-from pygam.distributions import PoissonDist
-from pygam.distributions import GammaDist
-from pygam.distributions import InvGaussDist
-from pygam.distributions import DISTRIBUTIONS
-
-from pygam.links import Link
-from pygam.links import IdentityLink
-from pygam.links import LogitLink
-from pygam.links import LogLink
-from pygam.links import InverseLink
-from pygam.links import InvSquaredLink
-from pygam.links import LINKS
-
-from pygam.callbacks import CallBack
-from pygam.callbacks import Deviance
-from pygam.callbacks import Diffs
-from pygam.callbacks import Accuracy
-from pygam.callbacks import Coef
-from pygam.callbacks import validate_callback
-from pygam.callbacks import CALLBACKS
-
-from pygam.utils import check_y
-from pygam.utils import check_X
-from pygam.utils import make_2d
-from pygam.utils import flatten
-from sklearn.utils import check_array
-from pygam.utils import check_lengths
-from pygam.utils import load_diagonal
-from pygam.utils import TablePrinter
-from pygam.utils import space_row
-from pygam.utils import sig_code
-from pygam.utils import b_spline_basis
-from pygam.utils import cholesky
-from pygam.utils import check_param
-from pygam.utils import isiterable
-from pygam.utils import NotPositiveDefiniteError
-from pygam.utils import OptimizationError
-
-from pygam.terms import Term
-from pygam.terms import Intercept, intercept
-from pygam.terms import LinearTerm, l
-from pygam.terms import SplineTerm, s
-from pygam.terms import FactorTerm, f
-from pygam.terms import TensorTerm, te
-from pygam.terms import TermList
-from pygam.terms import MetaTermMixin
-
+from pygam.distributions import (
+    DISTRIBUTIONS,
+    BinomialDist,
+    Distribution,
+    GammaDist,
+    InvGaussDist,
+    NormalDist,
+    PoissonDist,
+)
+from pygam.links import LINKS, IdentityLink, InverseLink, InvSquaredLink, Link, LogitLink, LogLink
+from pygam.optimization import _cholesky, cholesky
+from pygam.penalties import (
+    CONSTRAINTS,
+    PENALTIES,
+    concave,
+    convex,
+    derivative,
+    l2,
+    monotonic_dec,
+    monotonic_inc,
+    none,
+    wrap_penalty,
+)
+from pygam.terms import (
+    FactorTerm,
+    Intercept,
+    LinearTerm,
+    MetaTermMixin,
+    SplineTerm,
+    TensorTerm,
+    Term,
+    TermList,
+    f,
+    intercept,
+    l,
+    s,
+    te,
+)
+from pygam.utils import (
+    NotPositiveDefiniteError,
+    OptimizationError,
+    TablePrinter,
+    b_spline_basis,
+    check_lengths,
+    check_param,
+    check_X,
+    check_y,
+    flatten,
+    isiterable,
+    load_diagonal,
+    make_2d,
+    sig_code,
+    space_row,
+)
 
 __all__ = [
     "derivative",
@@ -116,7 +109,6 @@ __all__ = [
     "space_row",
     "sig_code",
     "b_spline_basis",
-    "combine",
     "cholesky",
     "check_param",
     "isiterable",
@@ -392,7 +384,7 @@ class GAM(Core, MetaTermMixin):
         log-likelihood : np.array of shape (n,)
             containing log-likelihood scores
         """
-        y = check_y(y, self.link, self.distribution, verbose=self.verbose)
+        y = check_y(y, self.link, self.distribution)
         mu = self.predict_mu(X)
 
         if weights is not None:
@@ -485,7 +477,6 @@ class GAM(Core, MetaTermMixin):
             edge_knots=self.edge_knots_,
             dtypes=self.dtype,
             features=self.feature,
-            verbose=self.verbose,
         )
 
         lp = self._linear_predictor(X)
@@ -533,49 +524,9 @@ class GAM(Core, MetaTermMixin):
             edge_knots=self.edge_knots_,
             dtypes=self.dtype,
             features=self.feature,
-            verbose=self.verbose,
         )
 
         return self.terms.build_columns(X, term=term)
-
-    def _cholesky(self, A, **kwargs):
-        """
-        method to handle potential problems with the cholesky decomposition.
-
-        will try to increase L2 regularization of the penalty matrix to
-        do away with non-positive-definite errors
-
-        Parameters
-        ----------
-        A : np.array
-
-        Returns
-        -------
-        np.array
-        """
-        # create appropriate-size diagonal matrix
-        if sp.sparse.issparse(A):
-            diag = sp.sparse.eye(A.shape[0])
-        else:
-            diag = np.eye(A.shape[0])
-
-        constraint_l2 = self._constraint_l2
-        while constraint_l2 <= self._constraint_l2_max:
-            try:
-
-                L = cholesky(A, **kwargs)
-                self._constraint_l2 = constraint_l2
-                return L
-            except NotPositiveDefiniteError:
-                if self.verbose:
-                    warnings.warn(
-                        "Matrix is not positive definite. \n" "Increasing l2 reg by factor of 10.", stacklevel=2
-                    )
-                A -= constraint_l2 * diag
-                constraint_l2 *= 10
-                A += constraint_l2 * diag
-
-        raise NotPositiveDefiniteError("Matrix is not positive \n" "definite.")
 
     def _P(self):
         """
@@ -666,6 +617,7 @@ class GAM(Core, MetaTermMixin):
         -------
         weights : sp..sparse array of shape (n_samples, n_samples)
         """
+        # Section 6.1.1, list entry (2) in Wood
         return sp.sparse.diags(
             (self.link.gradient(mu, self.distribution) ** 2 * self.distribution.V(mu=mu) * weights**-1) ** -0.5
         )
@@ -736,7 +688,7 @@ class GAM(Core, MetaTermMixin):
         y[y == 1] -= 0.01  # edge case for logit link
 
         y_ = self.link.link(y, self.distribution)
-        y_ = make_2d(y_, verbose=False)
+        y_ = make_2d(y_)
         assert np.isfinite(y_).all(), "transformed response values should be well-behaved."
 
         # solve the linear problem
@@ -748,6 +700,10 @@ class GAM(Core, MetaTermMixin):
     def _pirls(self, X, Y, weights):
         """
         Performs stable PIRLS iterations to estimate GAM coefficients
+
+        https://www.jstor.org/stable/20203839
+        section 6.1.1 in Wood on PIRLS   (p251)
+        section 3.1.2 in Wood on fitting (p107)
 
         Parameters
         ---------
@@ -779,7 +735,11 @@ class GAM(Core, MetaTermMixin):
 
         # if we dont have any constraints, then do cholesky now
         if not self.terms.hasconstraint:
-            E = self._cholesky(S + P, sparse=False, verbose=self.verbose)
+
+            # TODO: Why is sparse flag always false?
+            E = _cholesky(
+                S + P, constraint_l2=self._constraint_l2, constraint_l2_max=self._constraint_l2_max, sparse=False
+            )
 
         min_n_m = np.min([m, n])
         Dinv = np.zeros((min_n_m + m, m)).T
@@ -789,9 +749,16 @@ class GAM(Core, MetaTermMixin):
 
             # recompute cholesky if needed
             if self.terms.hasconstraint:
-                P = self._P()
-                C = self._C()
-                E = self._cholesky(S + P + C, sparse=False, verbose=self.verbose)
+                P = self._P()  # Penalty matrix
+                C = self._C()  # Constraint matrix
+
+                # TODO: Why is sparse flag always false?
+                E = _cholesky(
+                    S + P + C,
+                    constraint_l2=self._constraint_l2,
+                    constraint_l2_max=self._constraint_l2_max,
+                    sparse=False,
+                )
 
             # forward pass
             y = deepcopy(Y)  # for simplicity
@@ -813,7 +780,8 @@ class GAM(Core, MetaTermMixin):
             self._on_loop_start(vars())
 
             WB = W.dot(modelmat[mask, :])  # common matrix product
-            Q, R = np.linalg.qr(WB.A)
+
+            Q, R = np.linalg.qr(WB.A)  # 'A' transforms scipy.sparse._csr.csr_matrix -> numpy.ndarray
 
             if not np.isfinite(Q).all() or not np.isfinite(R).all():
                 raise ValueError("QR decomposition produced NaN or Inf. " "Check X data.")
@@ -964,14 +932,13 @@ class GAM(Core, MetaTermMixin):
             Returns fitted GAM object
         """
         logger.info("Created GAM instance")
-        print("fit")
 
         # validate parameters
         self._validate_params()
 
         # validate data
-        y = check_y(y, self.link, self.distribution, verbose=self.verbose)
-        X = check_X(X, verbose=self.verbose)
+        y = check_y(y, self.link, self.distribution)
+        X = check_X(X)
         check_X_y(X, y)
 
         if weights is not None:
@@ -1050,14 +1017,13 @@ class GAM(Core, MetaTermMixin):
         if not self._is_fitted:
             raise AttributeError("GAM has not been fitted. Call fit first.")
 
-        y = check_y(y, self.link, self.distribution, verbose=self.verbose)
+        y = check_y(y, self.link, self.distribution)
         X = check_X(
             X,
             n_feats=self.statistics_["m_features"],
             edge_knots=self.edge_knots_,
             dtypes=self.dtype,
             features=self.feature,
-            verbose=self.verbose,
         )
         check_X_y(X, y)
 
@@ -1381,7 +1347,6 @@ class GAM(Core, MetaTermMixin):
             edge_knots=self.edge_knots_,
             dtypes=self.dtype,
             features=self.feature,
-            verbose=self.verbose,
         )
 
         return self._get_quantiles(X, width, quantiles, prediction=False)
@@ -1639,7 +1604,6 @@ class GAM(Core, MetaTermMixin):
                 edge_knots=self.edge_knots_,
                 dtypes=self.dtype,
                 features=self.feature,
-                verbose=self.verbose,
             )
 
         modelmat = self._modelmat(X, term=term)
@@ -1915,8 +1879,8 @@ class GAM(Core, MetaTermMixin):
         if not self._is_fitted:
             self._validate_params()
 
-        y = check_y(y, self.link, self.distribution, verbose=self.verbose)
-        X = check_X(X, verbose=self.verbose)
+        y = check_y(y, self.link, self.distribution)
+        X = check_X(X)
 
         X_to_check = X.values if isinstance(X, (pd.DataFrame, pd.Series)) else X
         y_to_check = y.values if isinstance(y, (pd.DataFrame, pd.Series)) else y
@@ -2460,7 +2424,6 @@ class LinearGAM(GAM):
             edge_knots=self.edge_knots_,
             dtypes=self.dtype,
             features=self.feature,
-            verbose=self.verbose,
         )
 
         return self._get_quantiles(X, width, quantiles, prediction=True)
@@ -2579,7 +2542,7 @@ class LogisticGAM(GAM):
         if not self._is_fitted:
             raise AttributeError("GAM has not been fitted. Call fit first.")
 
-        y = check_y(y, self.link, self.distribution, verbose=self.verbose)
+        y = check_y(y, self.link, self.distribution)
         if X is not None:
             X = check_X(
                 X,
@@ -2587,7 +2550,6 @@ class LogisticGAM(GAM):
                 edge_knots=self.edge_knots_,
                 dtypes=self.dtype,
                 features=self.feature,
-                verbose=self.verbose,
             )
 
         if mu is None:
@@ -2786,7 +2748,7 @@ class PoissonGAM(GAM):
         log-likelihood : np.array of shape (n,)
             containing log-likelihood scores
         """
-        y = check_y(y, self.link, self.distribution, verbose=self.verbose)
+        y = check_y(y, self.link, self.distribution)
         mu = self.predict_mu(X)
 
         if weights is not None:
@@ -2907,7 +2869,6 @@ class PoissonGAM(GAM):
             edge_knots=self.edge_knots_,
             dtypes=self.dtype,
             features=self.feature,
-            verbose=self.verbose,
         )
 
         if exposure is not None:

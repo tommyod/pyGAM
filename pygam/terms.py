@@ -1,18 +1,17 @@
 """
 Link functions
 """
-from abc import ABCMeta
-from abc import abstractmethod, abstractproperty
-from collections import defaultdict
 import warnings
+from abc import ABCMeta, abstractmethod, abstractproperty
+from collections import defaultdict
 from copy import deepcopy
 
 import numpy as np
 import scipy as sp
 
 from pygam.core import Core, nice_repr
-from pygam.utils import isiterable, check_param, flatten, gen_edge_knots, b_spline_basis, tensor_product
-from pygam.penalties import PENALTIES, CONSTRAINTS
+from pygam.penalties import CONSTRAINTS, PENALTIES
+from pygam.utils import b_spline_basis, check_param, flatten, gen_edge_knots, isiterable, tensor_product
 
 
 class Term(Core):
@@ -564,7 +563,7 @@ class LinearTerm(Term):
                 "term requires feature {}, " "but X has only {} dimensions".format(self.feature, X.shape[1])
             )
 
-        self.edge_knots_ = gen_edge_knots(X[:, self.feature], self.dtype, verbose=verbose)
+        self.edge_knots_ = gen_edge_knots(X[:, self.feature], self.dtype)
         return self
 
     def build_columns(self, X, verbose=False):
@@ -781,7 +780,7 @@ class SplineTerm(Term):
             )
 
         if not hasattr(self, "edge_knots_"):
-            self.edge_knots_ = gen_edge_knots(X[:, self.feature], self.dtype, verbose=verbose)
+            self.edge_knots_ = gen_edge_knots(X[:, self.feature], self.dtype)
         return self
 
     def build_columns(self, X, verbose=False):
@@ -808,7 +807,6 @@ class SplineTerm(Term):
             n_splines=self.n_splines,
             sparse=True,
             periodic=self.basis in ["cp"],
-            verbose=verbose,
         )
 
         if self.by is not None:
@@ -919,7 +917,7 @@ class FactorTerm(SplineTerm):
         super().compile(X)
 
         self.n_splines = len(np.unique(X[:, self.feature]))
-        self.edge_knots_ = gen_edge_knots(X[:, self.feature], self.dtype, verbose=verbose)
+        self.edge_knots_ = gen_edge_knots(X[:, self.feature], self.dtype)
         return self
 
     def build_columns(self, X, verbose=False):
