@@ -6,6 +6,123 @@ import warnings
 
 import numpy as np
 import scipy as sp
+import functools
+
+
+class FDMatrix:
+    """Finite differene matrix."""
+
+    @staticmethod
+    def forward_diff(n, periodic=True):
+        """Create a forward difference matrix D such that f' = D f.
+
+        Parameters
+        ----------
+        n : int
+            Size of matrix.
+        periodic : bool, optional
+            Whether to wrap around the boundary. The default is True.
+
+        Returns
+        -------
+        np.ndarray
+            Forward difference matrix.
+
+        Examples
+        --------
+        >>> FDMatrix.forward_diff(4, periodic=True)
+        array([[-1.,  1.,  0.,  0.],
+               [ 0., -1.,  1.,  0.],
+               [ 0.,  0., -1.,  1.],
+               [ 1.,  0.,  0., -1.]])
+        >>> FDMatrix.forward_diff(4, periodic=False)
+        array([[-1.,  1.,  0.,  0.],
+               [ 0., -1.,  1.,  0.],
+               [ 0.,  0., -1.,  1.],
+               [ 0.,  0.,  0., -1.]])
+        """
+        if periodic:
+            return sp.linalg.circulant([-1] + [0] * (n - 2) + [1]).astype(float)
+        else:
+            return (np.eye(n, k=1) - np.eye(n)).astype(float)
+
+    @staticmethod
+    def backward_diff(n, periodic=True):
+        """Create a backward difference matrix D such that f' = D f.
+
+        Parameters
+        ----------
+        n : int
+            Size of matrix.
+        periodic : bool, optional
+            Whether to wrap around the boundary. The default is True.
+
+        Returns
+        -------
+        np.ndarray
+            Backward difference matrix.
+
+        Examples
+        --------
+        >>> FDMatrix.backward_diff(4, periodic=True)
+        array([[ 1.,  0.,  0., -1.],
+               [-1.,  1.,  0.,  0.],
+               [ 0., -1.,  1.,  0.],
+               [ 0.,  0., -1.,  1.]])
+        >>> FDMatrix.backward_diff(4, periodic=False)
+        array([[ 1.,  0.,  0.,  0.],
+               [-1.,  1.,  0.,  0.],
+               [ 0., -1.,  1.,  0.],
+               [ 0.,  0., -1.,  1.]])
+        """
+        if periodic:
+            return sp.linalg.circulant([1] + [0] * (n - 2) + [-1]).T.astype(float)
+        else:
+            return (np.eye(n) - np.eye(n, k=-1)).astype(float)
+
+    @classmethod
+    def centered_diff(cls, n, periodic=True):
+        """Create a centered difference matrix D such that f' = D f.
+
+        Parameters
+        ----------
+        n : int
+            Size of matrix.
+        periodic : bool, optional
+            Whether to wrap around the boundary. The default is True.
+
+        Returns
+        -------
+        np.ndarray
+            Backward difference matrix.
+
+        Examples
+        --------
+        >>> FDMatrix.centered_diff(6, True)
+        array([[ 0. ,  0.5,  0. ,  0. ,  0. , -0.5],
+               [-0.5,  0. ,  0.5,  0. ,  0. ,  0. ],
+               [ 0. , -0.5,  0. ,  0.5,  0. ,  0. ],
+               [ 0. ,  0. , -0.5,  0. ,  0.5,  0. ],
+               [ 0. ,  0. ,  0. , -0.5,  0. ,  0.5],
+               [ 0.5,  0. ,  0. ,  0. , -0.5,  0. ]])
+        >>> FDMatrix.backward_diff(4, periodic=False)
+        array([[ 1.,  0.,  0.,  0.],
+               [-1.,  1.,  0.,  0.],
+               [ 0., -1.,  1.,  0.],
+               [ 0.,  0., -1.,  1.]])
+        """
+        if periodic:
+            return (cls.forward_diff(n, periodic) + cls.backward_diff(n, periodic)) / 2.0
+        else:
+            D = (cls.forward_diff(n, periodic) + cls.backward_diff(n, periodic)) / 2.0
+            D[0, :2] = [-1.0, 1.0]  # Use forward difference for first element
+            D[-1, -2:] = [-1.0, 1.0]  # Use backward difference for last element
+            return D
+
+
+# =============================================================================
+# PENALTIES
+# =============================================================================
 
 
 def derivative(n, coef, derivative=2, periodic=False):
@@ -73,6 +190,19 @@ def l2(n, coef):
     return sp.sparse.eye(n).tocsc()
 
 
+# =============================================================================
+# CONSTRAINTS
+# =============================================================================
+
+
+def monotonic_inc(n, coef):
+    return monotonicity_(n, coef, increasing=True)
+
+
+def monotonic_dec(n, coef):
+    return monotonicity_(n, coef, increasing=False)
+
+
 def monotonicity_(n, coef, increasing=True):
     """
     Builds a penalty matrix for P-Splines with continuous features.
@@ -110,43 +240,6 @@ def monotonicity_(n, coef, increasing=True):
     derivative = 1
     D = sparse_diff(sp.sparse.identity(n).tocsc(), n=derivative) * mask
     return D.dot(D.T).tocsc()
-
-
-def monotonic_inc(n, coef):
-    """
-    Builds a penalty matrix for P-Splines with continuous features.
-    Penalizes violation of a monotonic increasing feature function.
-
-    Parameters
-    ----------
-    n : int
-        number of splines
-    coef : array-like, coefficients of the feature function
-
-    Returns
-    -------
-    penalty matrix : sparse csc matrix of shape (n,n)
-    """
-    return monotonicity_(n, coef, increasing=True)
-
-
-def monotonic_dec(n, coef):
-    """
-    Builds a penalty matrix for P-Splines with continuous features.
-    Penalizes violation of a monotonic decreasing feature function.
-
-    Parameters
-    ----------
-    n : int
-        number of splines
-    coef : array-like
-        coefficients of the feature function
-
-    Returns
-    -------
-    penalty matrix : sparse csc matrix of shape (n,n)
-    """
-    return monotonicity_(n, coef, increasing=False)
 
 
 def convexity_(n, coef, convex=True):
@@ -187,73 +280,11 @@ def convexity_(n, coef, convex=True):
 
 
 def convex(n, coef):
-    """
-    Builds a penalty matrix for P-Splines with continuous features.
-    Penalizes violation of a convex feature function.
-
-    Parameters
-    ----------
-    n : int
-        number of splines
-    coef : array-like
-        coefficients of the feature function
-
-    Returns
-    -------
-    penalty matrix : sparse csc matrix of shape (n,n)
-    """
     return convexity_(n, coef, convex=True)
 
 
 def concave(n, coef):
-    """
-    Builds a penalty matrix for P-Splines with continuous features.
-    Penalizes violation of a concave feature function.
-
-    Parameters
-    ----------
-    n : int
-        number of splines
-    coef : array-like
-        coefficients of the feature function
-
-    Returns
-    -------
-    penalty matrix : sparse csc matrix of shape (n,n)
-    """
     return convexity_(n, coef, convex=False)
-
-
-# def circular(n, coef):
-#     """
-#     Builds a penalty matrix for P-Splines with continuous features.
-#     Penalizes violation of a circular feature function.
-#
-#     Parameters
-#     ----------
-#     n : int
-#         number of splines
-#     coef : unused
-#         for compatibility with constraints
-#
-#     Returns
-#     -------
-#     penalty matrix : sparse csc matrix of shape (n,n)
-#     """
-#     if n != len(coef.ravel()):
-#         raise ValueError('dimension mismatch: expected n equals len(coef), '\
-#                          'but found n = {}, coef.shape = {}.'\
-#                          .format(n, coef.shape))
-#
-#     if n==1:
-#         # no first circular penalty for constant functions
-#         return sp.sparse.csc_matrix(0.)
-#
-#     row = np.zeros(n)
-#     row[0] = 1
-#     row[-1] = -1
-#     P = sp.sparse.vstack([row, sp.sparse.csc_matrix((n-2, n)), row[::-1]])
-#     return P.tocsc()
 
 
 def none(n, coef):
@@ -272,6 +303,11 @@ def none(n, coef):
     penalty matrix : sparse csc matrix of shape (n,n)
     """
     return sp.sparse.csc_matrix((n, n))
+
+
+# =============================================================================
+# OTHER
+# =============================================================================
 
 
 def wrap_penalty(p, fit_linear, linear_penalty=0.0):
@@ -355,3 +391,39 @@ CONSTRAINTS = {
     "monotonic_dec": monotonic_dec,
     "none": none,
 }
+
+if __name__ == "__main__":
+    import pytest
+
+    pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules"])
+
+    import time
+
+    for penalty_name, penalty_func in PENALTIES.items():
+
+        if not callable(penalty_func):
+            continue
+
+        st = time.perf_counter()
+        penalty_func(1000, np.random.randn(1000))
+        elapsed = round(time.perf_counter() - st, 8)
+        print(f"{penalty_name} in {elapsed} seconds")
+
+    for penalty_name, penalty_func in CONSTRAINTS.items():
+
+        if not callable(penalty_func):
+            continue
+
+        st = time.perf_counter()
+        penalty_func(1000, np.random.randn(1000))
+        elapsed = round(time.perf_counter() - st, 8)
+        print(f"{penalty_name} in {elapsed} seconds")
+
+    x = np.linspace(0, 2 * np.pi, num=2**10, endpoint=False)
+    y = np.sin(x)
+    dx = x[1] - x[0]
+    n = len(x)
+    periodic = True
+    D = FDMatrix.centered_diff(n, periodic=periodic) / dx
+
+    assert np.allclose(np.cos(x), D @ y)

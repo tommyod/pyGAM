@@ -818,62 +818,76 @@ class GAM(Core, MetaTermMixin):
 
         return
 
-    # def _pirls_naive(self, X, y):
-    #     """
-    #     Performs naive PIRLS iterations to estimate GAM coefficients
-    #
-    #     Parameters
-    #     ---------
-    #     X : array-like of shape (n_samples, m_features)
-    #         containing input data
-    #     y : array-like of shape (n,)
-    #         containing target data
-    #
-    #     Returns
-    #     -------
-    #     None
-    #     """
-    #     modelmat = self._modelmat(X) # build a basis matrix for the GLM
-    #     m = modelmat.shape[1]
-    #
-    #     # initialize GLM coefficients
-    #     if not self._is_fitted or len(self.coef_) != sum(self._n_coeffs):
-    #         self.coef_ = np.ones(m) * np.sqrt(EPS) # allow more training
-    #
-    #     P = self._P() # create penalty matrix
-    #     P += sp.sparse.diags(np.ones(m) * np.sqrt(EPS)) # improve condition
-    #
-    #     for _ in range(self.max_iter):
-    #         lp = self._linear_predictor(modelmat=modelmat)
-    #         mu = self.link.mu(lp, self.distribution)
-    #
-    #         mask = self._mask(mu)
-    #         mu = mu[mask] # update
-    #         lp = lp[mask] # update
-    #
-    #         if self.family == 'binomial':
-    #             self.acc.append(self.accuracy(y=y[mask], mu=mu)) # log the training accuracy
-    #         self.dev.append(self.deviance_(y=y[mask], mu=mu, scaled=False)) # log the training deviance
-    #
-    #         weights = self._W(mu)**2 # PIRLS, added square for modularity
-    #         pseudo_data = self._pseudo_data(y, lp, mu) # PIRLS
-    #
-    #         BW = modelmat.T.dot(weights).tocsc() # common matrix product
-    #         inner = sp.sparse.linalg.inv(BW.dot(modelmat) + P) # keep for edof
-    #
-    #         coef_new = inner.dot(BW).dot(pseudo_data).flatten()
-    #         diff = np.linalg.norm(self.coef_ - coef_new)/np.linalg.norm(coef_new)
-    #         self.diffs.append(diff)
-    #         self.coef_ = coef_new # update
-    #
-    #         # check convergence
-    #         if diff < self.tol:
-    #             self.edof_ = self._estimate_edof(modelmat, inner, BW)
-    #             self.aic_ = self._estimate_AIC(X, y, mu)
-    #             self.aicc_ = self._estimate_AICc(X, y, mu)
-    #             return
-    #
-    #     print('did not converge')
+    def _pirls_naive(self, X, y):
+        """
+        Performs naive PIRLS iterations to estimate GAM coefficients
+
+        Parameters
+        ---------
+        X : array-like of shape (n_samples, m_features)
+            containing input data
+        y : array-like of shape (n,)
+            containing target data
+
+        Returns
+        -------
+        None
+        """
+        modelmat = self._modelmat(X)  # build a basis matrix for the GLM
+        m = modelmat.shape[1]
+
+        # initialize GLM coefficients
+        if not self._is_fitted or len(self.coef_) != sum(self._n_coeffs):
+            self.coef_ = np.ones(m) * np.sqrt(EPS)  # allow more training
+
+        P = self._P()  # create penalty matrix
+        P += sp.sparse.diags(np.ones(m) * np.sqrt(EPS))  # improve condition
+
+        # Fisher weights
+        alpha = 1
+
+        # Step 1: Initialize mu and eta
+        beta = 0
+        mu = y + np.sqrt(EPS)
+        eta = self.link.link(mu, dist=self.distribution)
+        assert np.isfinite(eta).all()
+
+        for iteration in range(1, self.max_iter + 1):
+            logger.info(f"PIRLS iteration {iteration}")
+
+            # Step 2: Compute pseudodata z and iterative weights w
+            # z = lp + (y - mu) * self.link.gradient(mu, self.distribution)
+            z = mu + (y - mu) * self.link.gradient(mu, self.distribution) / alpha
+            g_prime = self.link.gradient(mu, self.distribution)
+            w = alpha / (g_prime**2 * self.distribution.V(mu=mu))
+            assert np.all(w > 0)
+
+            # Step 3: Find beta, the minimizer of the least squares objective
+            # |z - X * beta|^2_W + |beta|^2_P
+            modelmat_w = (modelmat.A.T * np.sqrt(w)).T
+
+            P_squared = sp.linalg.cholesky(P.A)
+            lhs_stacked = np.vstack((modelmat_w, P_squared))
+            rhs_stacked = np.hstack((np.sqrt(w) * z, np.zeros(P.shape[0])))
+
+            beta_new, residuals, rank, singular_values = sp.linalg.lstsq(lhs_stacked, rhs_stacked)
+
+            # Update eta and mu
+            eta = modelmat.A @ beta_new
+            mu = self.link.mu(eta, dist=self.distribution)
+
+            relative_error = np.linalg.norm(beta - beta_new) / np.linalg.norm(beta_new)
+
+            # Convergence
+            print("Convergence", relative_error)
+
+            beta = beta_new
+            self.coef_ = beta  # update
+
+            if relative_error < self.tol:
+                return
+
+        raise Exception("Did not converge")
 
     def _on_loop_start(self, variables):
         """
@@ -961,7 +975,9 @@ class GAM(Core, MetaTermMixin):
         self.statistics_["m_features"] = X.shape[1]
 
         # optimize
+        # self._pirls_naive(X, y)
         self._pirls(X, y, weights)
+
         # if self._opt == 0:
         #     self._pirls(X, y, weights)
         # if self._opt == 1:
@@ -3431,3 +3447,14 @@ class ExpectileGAM(GAM):
             warnings.warn("maximum iterations reached")
 
         return self
+
+
+if __name__ == "__main__":
+
+    x = np.linspace(0, 1, num=2**10)
+    y = np.sin(x * 2.5) + np.random.randn(len(x)) / 5
+    X = x.reshape(-1, 1)
+
+    from pygam import LinearGAM, s, f
+
+    gam = LinearGAM(s(0, n_splines=5)).fit(X, y)

@@ -5,6 +5,8 @@ import warnings
 from abc import ABCMeta, abstractmethod, abstractproperty
 from collections import defaultdict
 from copy import deepcopy
+import collections.abc
+import numbers
 
 import numpy as np
 import scipy as sp
@@ -134,63 +136,67 @@ class Term(Core):
         )
 
     def _validate_arguments(self):
-        """method to sanitize model parameters
-
-        Parameters
-        ---------
-        None
-
-        Returns
-        -------
-        None
-        """
+        """Validate and sanitize arguments."""
         # dtype
         if self.dtype not in ["numerical", "categorical"]:
-            raise ValueError("dtype must be in ['numerical','categorical'], " "but found dtype = {}".format(self.dtype))
+            msg = f"dtype must be in ['numerical', 'categorical'], found dtype = {self.dtype}"
+            raise ValueError(msg)
 
         # fit_linear XOR fit_splines
         if self.fit_linear == self.fit_splines:
-            raise ValueError(
-                "term must have fit_linear XOR fit_splines, but found: "
-                "fit_linear= {}, fit_splines={}".format(self.fit_linear, self.fit_splines)
-            )
+            msg = "Either 'fit_linear' or 'fit_splines' must be True, but not both."
+            raise ValueError(msg)
 
-        # penalties
-        if not isiterable(self.penalties):
-            self.penalties = [self.penalties]
+        # Convert to list
+        self.penalties = (
+            [self.penalties]
+            if (isinstance(self.penalties, str) or self.penalties is None or callable(self.penalties))
+            else list(self.penalties)
+        )
 
-        for i, p in enumerate(self.penalties):
-            if not (hasattr(p, "__call__") or (p in PENALTIES) or (p is None)):
-                raise ValueError(
-                    "penalties must be callable or in "
-                    "{}, but found {} for {}th penalty".format(list(PENALTIES.keys()), p, i)
-                )
+        # Validate each penalty
+        for i, penalty in enumerate(self.penalties):
+            is_callable = callable(penalty)
+            is_valid_str = penalty in PENALTIES
+            is_None = penalty is None
+
+            if not any((is_callable, is_valid_str, is_None)):
+                msg = f"Penalty number {i} ({penalty}) not in {list(PENALTIES.keys())}"
+                raise ValueError(msg)
 
         # check lams and distribute to penalites
-        if not isiterable(self.lam):
+        if not isinstance(self.lam, collections.abc.Iterable):
             self.lam = [self.lam]
 
         for lam in self.lam:
-            check_param(lam, param_name="lam", dtype="float", constraint=">= 0")
+            if not isinstance(lam, numbers.Real):
+                raise TypeError("Parameter 'lam' must be a number")
+            if lam < 0:
+                raise ValueError("Paramter 'lam' must be >= 0")
 
         if len(self.lam) == 1:
             self.lam = self.lam * len(self.penalties)
 
         if len(self.lam) != len(self.penalties):
-            raise ValueError(
-                "expected 1 lam per penalty, but found " "lam = {}, penalties = {}".format(self.lam, self.penalties)
-            )
+            msg = f"Length of penalties ({len(self.penalties)}) does not match length of lam ({len(self.lam)})"
+            raise ValueError(msg)
 
         # constraints
-        if not isiterable(self.constraints):
-            self.constraints = [self.constraints]
+        self.constraints = (
+            [self.constraints]
+            if (isinstance(self.constraints, str) or self.constraints is None or callable(self.constraints))
+            else list(self.constraints)
+        )
 
-        for i, c in enumerate(self.constraints):
-            if not (hasattr(c, "__call__") or (c in CONSTRAINTS) or (c is None)):
-                raise ValueError(
-                    "constraints must be callable or in "
-                    "{}, but found {} for {}th constraint".format(list(CONSTRAINTS.keys()), c, i)
-                )
+        # Validate each constraint
+        for i, constraint in enumerate(self.constraints):
+            is_callable = callable(constraint)
+            is_valid_str = constraint in CONSTRAINTS
+            is_None = constraint is None
+
+            if not any((is_callable, is_valid_str, is_None)):
+                msg = f"Constraint number {i} ({constraint}) not in {list(CONSTRAINTS.keys())}"
+                raise ValueError(msg)
 
         return self
 
@@ -289,6 +295,21 @@ class Term(Core):
         """
         pass
 
+    def _determine_auto(self):
+        """Map 'auto' penalty to appropriate penalty type."""
+        if self.dtype == "numerical":
+            if self._name == "spline_term":
+                if self.basis in ["cp"]:
+                    penalty = "periodic"
+                else:
+                    penalty = "derivative"
+            else:
+                penalty = "l2"
+        if self.dtype == "categorical":
+            penalty = "l2"
+
+        return penalty
+
     def build_penalties(self, verbose=False):
         """
         builds the GAM block-diagonal penalty matrix in quadratic form
@@ -313,24 +334,21 @@ class Term(Core):
 
         Ps = []
         for penalty, lam in zip(self.penalties, self.lam):
+
             if penalty == "auto":
-                if self.dtype == "numerical":
-                    if self._name == "spline_term":
-                        if self.basis in ["cp"]:
-                            penalty = "periodic"
-                        else:
-                            penalty = "derivative"
-                    else:
-                        penalty = "l2"
-                if self.dtype == "categorical":
-                    penalty = "l2"
-            if penalty is None:
+                penalty = self._determine_auto()
+            elif penalty is None:
                 penalty = "none"
+
             if penalty in PENALTIES:
                 penalty = PENALTIES[penalty]
 
+            if not callable(penalty):
+                raise TypeError(f"'penalty must be callable. Found: {penalty}'")
+
             P = penalty(self.n_coefs, coef=None)  # penalties dont need coef
             Ps.append(np.multiply(P, lam))
+
         return np.sum(Ps)
 
     def build_constraints(self, coef, constraint_lam, constraint_l2):
@@ -369,6 +387,9 @@ class Term(Core):
                 constraint = "none"
             if constraint in CONSTRAINTS:
                 constraint = CONSTRAINTS[constraint]
+
+            if not callable(constraint):
+                raise TypeError(f"'constraint must be callable. Found: {constraint}'")
 
             C = constraint(self.n_coefs, coef) * constraint_lam
             Cs.append(C)
@@ -728,20 +749,17 @@ class SplineTerm(Term):
         super()._validate_arguments()
 
         if self.basis not in self._bases:
-            raise ValueError("basis must be one of {}, " "but found: {}".format(self._bases, self.basis))
+            raise ValueError(f"basis must be one of {self._bases}, but found: {self.basis}")
 
         # n_splines
-        self.n_splines = check_param(self.n_splines, param_name="n_splines", dtype="int", constraint=">= 0")
+        if not isinstance(self.n_splines, numbers.Integral):
+            raise TypeError("Argument 'n_splines' must be an integer")
+
+        if self.n_splines < 0:
+            raise ValueError("Argument 'n_splines' must be >= 0")
 
         # spline_order
         self.spline_order = check_param(self.spline_order, param_name="spline_order", dtype="int", constraint=">= 0")
-
-        # n_splines + spline_order
-        if not self.n_splines > self.spline_order:
-            raise ValueError(
-                "n_splines must be > spline_order. "
-                "found: n_splines = {} and spline_order = {}".format(self.n_splines, self.spline_order)
-            )
 
         # by
         if self.by is not None:
