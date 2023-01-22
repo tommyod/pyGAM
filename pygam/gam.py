@@ -618,9 +618,7 @@ class GAM(Core, MetaTermMixin):
         weights : sp..sparse array of shape (n_samples, n_samples)
         """
         # Section 6.1.1, list entry (2) in Wood
-        return sp.sparse.diags(
-            (self.link.gradient(mu, self.distribution) ** 2 * self.distribution.V(mu=mu) * weights**-1) ** -0.5
-        )
+        return (self.link.gradient(mu, self.distribution) ** 2 * self.distribution.V(mu=mu) * weights**-1) ** -0.5
 
     def _mask(self, weights):
         """
@@ -718,20 +716,21 @@ class GAM(Core, MetaTermMixin):
         -------
         None
         """
-        modelmat = self._modelmat(X)  # build a basis matrix for the GLM
-        n, m = modelmat.shape
+
+        # Builds a model matrix out of the spline basis for each feature
+        modelmat = self._modelmat(X)
+        num_observations, num_splines = modelmat.shape
 
         # initialize GLM coefficients if model is not yet fitted
         if not self._is_fitted or len(self.coef_) != self.terms.n_coefs or not np.isfinite(self.coef_).all():
-
-            # initialize the model
             self.coef_ = self._initial_estimate(Y, modelmat)
 
-        assert np.isfinite(self.coef_).all(), "coefficients should be well-behaved, but found: {}".format(self.coef_)
+        if not np.isfinite(self.coef_).all():
+            raise ValueError("Coefficient should be well-behaved.")
 
+        # Penalty matrix of size (num_splines, num_splines)
         P = self._P()
-        S = sp.sparse.diags(np.ones(m) * np.sqrt(EPS))  # improve condition
-        # S += self._H # add any user-chosen minumum penalty to the diagonal
+        S = sp.sparse.diags(np.ones(num_splines) * np.sqrt(EPS))  # improve condition
 
         # if we dont have any constraints, then do cholesky now
         if not self.terms.hasconstraint:
@@ -741,54 +740,58 @@ class GAM(Core, MetaTermMixin):
                 S + P, constraint_l2=self._constraint_l2, constraint_l2_max=self._constraint_l2_max, sparse=False
             )
 
-        min_n_m = np.min([m, n])
-        Dinv = np.zeros((min_n_m + m, m)).T
+        min_n_m = min(num_splines, num_observations)
 
         for iteration in range(1, self.max_iter + 1):
             logger.info(f"PIRLS iteration {iteration}")
 
-            # recompute cholesky if needed
+            # Recompute cholesky if needed. The constraint matrix C is a
+            # function of the current parameter estimates
             if self.terms.hasconstraint:
-                P = self._P()  # Penalty matrix
-                C = self._C()  # Constraint matrix
 
                 # TODO: Why is sparse flag always false?
                 E = _cholesky(
-                    S + P + C,
+                    S + P + self._C(),
                     constraint_l2=self._constraint_l2,
                     constraint_l2_max=self._constraint_l2_max,
                     sparse=False,
                 )
 
             # forward pass
-            y = deepcopy(Y)  # for simplicity
+            y = deepcopy(Y)  # TODO: Why?
             lp = self._linear_predictor(modelmat=modelmat)
             mu = self.link.mu(lp, self.distribution)
-            W = self._W(mu, weights, y)  # create pirls weight matrix
 
-            # check for weghts == 0, nan, and update
-            mask = self._mask(W.diagonal())
-            y = y[mask]  # update
-            lp = lp[mask]  # update
-            mu = mu[mask]  # update
-            W = sp.sparse.diags(W.diagonal()[mask])  # update
+            # Create weight vector
+            # w = (self.link.gradient(mu, self.distribution) ** 2 * self.distribution.V(mu=mu) * weights**-1) ** -0.5
+            # w = np.sqrt(weights) / (np.sqrt(self.distribution.V(mu=mu)) * self.link.gradient(mu, self.distribution))
+            w = self._W(mu, weights, y=y)
+            mask = (np.abs(w) >= np.sqrt(EPS)) * np.isfinite(w)
+
+            # Mask variables
+            y = y[mask]
+            lp = lp[mask]
+            mu = mu[mask]
+            w = w[mask]
 
             # PIRLS Wood pg 183
-            pseudo_data = W.dot(self._pseudo_data(y, lp, mu))
+
+            # pseudo_data = W.dot(self._pseudo_data(y, lp, mu))
+            pseudo_data = self._pseudo_data(y, lp, mu) * w
 
             # log on-loop-start stats
             self._on_loop_start(vars())
 
-            WB = W.dot(modelmat[mask, :])  # common matrix product
-
-            Q, R = np.linalg.qr(WB.A)  # 'A' transforms scipy.sparse._csr.csr_matrix -> numpy.ndarray
+            WB = (modelmat[mask, :].A.T * w).T
+            WB = (sp.sparse.diags(w) * modelmat[mask, :]).A
+            Q, R = np.linalg.qr(WB)  # 'A' transforms scipy.sparse._csr.csr_matrix -> numpy.ndarray
 
             if not np.isfinite(Q).all() or not np.isfinite(R).all():
-                raise ValueError("QR decomposition produced NaN or Inf. " "Check X data.")
+                raise ValueError("QR decomposition produced NaN or Inf. Check X data.")
 
             # need to recompute the number of singular values
-            min_n_m = np.min([m, n, mask.sum()])
-            Dinv = np.zeros((m, min_n_m))
+            min_n_m = np.min([num_splines, num_observations, mask.sum()])
+            Dinv = np.zeros((num_splines, min_n_m))
 
             # SVD
             U, d, Vt = np.linalg.svd(np.vstack([R, E]))
@@ -1914,25 +1917,21 @@ class GAM(Core, MetaTermMixin):
             weights = np.ones_like(y).astype("float64")
 
         # validate objective
-        if objective not in ["auto", "GCV", "UBRE", "AIC", "AICc"]:
-            raise ValueError(
-                "objective mut be in "
-                "['auto', 'GCV', 'UBRE', 'AIC', 'AICc'], '\
-                             'but found objective = {}".format(
-                    objective
-                )
-            )
+        objectives = ["auto", "GCV", "UBRE", "AIC", "AICc"]
+        if objective not in objectives:
+            msg = f"{objective} not in {objectives}"
+            raise ValueError(msg)
 
         # check objective
         if self.distribution._known_scale:
             if objective == "GCV":
-                raise ValueError("GCV should be used for models with" "unknown scale")
+                raise ValueError("GCV should be used for models with unknown scale")
             if objective == "auto":
                 objective = "UBRE"
 
         else:
             if objective == "UBRE":
-                raise ValueError("UBRE should be used for models with " "known scale")
+                raise ValueError("UBRE should be used for models with known scale")
             if objective == "auto":
                 objective = "GCV"
 
@@ -2034,6 +2033,9 @@ class GAM(Core, MetaTermMixin):
             # record results
             models.append(gam)
             scores.append(gam.statistics_[objective])
+
+            logger.info(grid)
+            logger.info(f"Score ({objective}) : {scores[-1]}")
 
             # track best
             if scores[-1] < best_score:
@@ -3352,10 +3354,9 @@ class ExpectileGAM(GAM):
         # asymmetric weight
         asym = (y > mu) * self.expectile + (y <= mu) * (1 - self.expectile)
 
-        return sp.sparse.diags(
-            (self.link.gradient(mu, self.distribution) ** 2 * self.distribution.V(mu=mu) * weights**-1) ** -0.5
-            * asym**0.5
-        )
+        return (
+            self.link.gradient(mu, self.distribution) ** 2 * self.distribution.V(mu=mu) * weights**-1
+        ) ** -0.5 * asym**0.5
 
     def _get_quantile_ratio(self, X, y):
         """find the expirical quantile of the model
@@ -3454,7 +3455,5 @@ if __name__ == "__main__":
     x = np.linspace(0, 1, num=2**10)
     y = np.sin(x * 2.5) + np.random.randn(len(x)) / 5
     X = x.reshape(-1, 1)
-
-    from pygam import LinearGAM, s, f
 
     gam = LinearGAM(s(0, n_splines=5)).fit(X, y)
