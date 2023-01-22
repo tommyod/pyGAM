@@ -695,7 +695,7 @@ class GAM(Core, MetaTermMixin):
         # not sure if this is faster...
         # return np.linalg.pinv(modelmat.T.dot(modelmat)).dot(modelmat.T.dot(y_))
 
-    def _pirls(self, X, Y, weights):
+    def _pirls(self):
         """
         Performs stable PIRLS iterations to estimate GAM coefficients
 
@@ -716,6 +716,11 @@ class GAM(Core, MetaTermMixin):
         -------
         None
         """
+        if not all(hasattr(self, name) for name in ("X_", "y_", "weights_")):
+            raise ValueError("Fit model...")
+
+        # Get data
+        X, Y, weights = self.X_, self.y_, self.weights_
 
         # Builds a model matrix out of the spline basis for each feature
         modelmat = self._modelmat(X)
@@ -758,7 +763,7 @@ class GAM(Core, MetaTermMixin):
                 )
 
             # forward pass
-            y = deepcopy(Y)  # TODO: Why?
+            y = deepcopy(Y)  # Because we mask it later
             lp = self._linear_predictor(modelmat=modelmat)
             mu = self.link.mu(lp, self.distribution)
 
@@ -797,17 +802,18 @@ class GAM(Core, MetaTermMixin):
             U, d, Vt = np.linalg.svd(np.vstack([R, E]))
             # svd_mask = d <= (d.max() * np.sqrt(EPS))  # mask out small singular values
 
-            np.fill_diagonal(Dinv, 1/d)  # invert the singular values
+            np.fill_diagonal(Dinv, 1 / d)  # invert the singular values
             U1 = U[:min_n_m, :min_n_m]  # keep only top corner of U
 
             # update coefficients
-            print(Dinv.shape)
-            print(Vt.T.shape)
-            
+            # print(Dinv.shape)
+            # print(Vt.T.shape)
+
             B = Vt.T.dot(Dinv).dot(U1.T).dot(Q.T)
-            B2 = (Vt.T * 1/d).dot(U1.T).dot(Q.T)
-            assert np.allclose(B, B2)
-            
+            # B2 = (Dinv2 * Vt.T).dot(U1.T).dot(Q.T)
+
+            # assert np.allclose(B, B2)
+
             coef_new = B.dot(pseudo_data).flatten()
             diff = np.linalg.norm(self.coef_ - coef_new) / np.linalg.norm(coef_new)
             self.coef_ = coef_new  # update
@@ -821,7 +827,7 @@ class GAM(Core, MetaTermMixin):
                 break
 
         # estimate statistics even if not converged
-        self._estimate_model_statistics(Y, modelmat, B=B, weights=weights, U1=U1)
+        self._estimate_model_statistics(B=B, weights=weights, U1=U1)
         if diff < self.tol:
             return
 
@@ -974,18 +980,20 @@ class GAM(Core, MetaTermMixin):
         # validate data-dependent parameters
         self._validate_data_dep_params(X)
 
+        self.X_ = X
+        self.y_ = y
+        self.weights_ = weights
+
         # set up logging
         if not hasattr(self, "logs_"):
             self.logs_ = defaultdict(list)
 
         # begin capturing statistics
-        self.statistics_ = {}
-        self.statistics_["n_samples"] = len(y)
-        self.statistics_["m_features"] = X.shape[1]
+        self.statistics_ = {"n_samples": len(y), "m_features": X.shape[1]}
 
         # optimize
         # self._pirls_naive(X, y)
-        self._pirls(X, y, weights)
+        self._pirls()
 
         # if self._opt == 0:
         #     self._pirls(X, y, weights)
@@ -1063,7 +1071,7 @@ class GAM(Core, MetaTermMixin):
         sign = np.sign(y - mu)
         return sign * self.distribution.deviance(y, mu, weights=weights, scaled=scaled) ** 0.5
 
-    def _estimate_model_statistics(self, y, modelmat, B=None, weights=None, U1=None):
+    def _estimate_model_statistics(self, B=None, weights=None, U1=None):
         """
         method to compute all of the model statistics
 
@@ -1097,16 +1105,34 @@ class GAM(Core, MetaTermMixin):
         -------
         None
         """
+        modelmat = self._modelmat(self.X_)
+        y = self.y_
+
         lp = self._linear_predictor(modelmat=modelmat)
         mu = self.link.mu(lp, self.distribution)
-        self.statistics_["edof_per_coef"] = np.diagonal(U1.dot(U1.T))
+
+        self.statistics_["edof_per_coef"] = np.sum(U1**2, axis=1)
         self.statistics_["edof"] = self.statistics_["edof_per_coef"].sum()
+
         if not self.distribution._known_scale:
             self.distribution.scale = self.distribution.phi(y=y, mu=mu, edof=self.statistics_["edof"], weights=weights)
-        self.statistics_["scale"] = self.distribution.scale
+
+        # With
+        # X_1 = modelmat.A
+        # W_1 = np.diag(w**2)
+        # S_1 = (S + P + self._C()).A
+        # we have
+        #             (equation 6.3 in wood)
+        # edof = np.diagonal(np.linalg.inv(X_1.T @ W_1 @ X_1 +S_1) @ X_1.T @ W_1 @ X_1)
+        # edof = np.diagonal(U1.dot(U1.T))
+        # edof = np.sum(U1**2, axis=1)
+
+        print(type(B), type(self.distribution.scale))
         self.statistics_["cov"] = (
             B.dot(B.T)
         ) * self.distribution.scale  # parameter covariances. no need to remove a W because we are using W^2. Wood pg 184
+
+        self.statistics_["scale"] = self.distribution.scale
         self.statistics_["se"] = self.statistics_["cov"].diagonal() ** 0.5
         self.statistics_["AIC"] = self._estimate_AIC(y=y, mu=mu, weights=weights)
         self.statistics_["AICc"] = self._estimate_AICc(y=y, mu=mu, weights=weights)
@@ -3462,4 +3488,4 @@ if __name__ == "__main__":
     y = np.sin(x * 2.5) + np.random.randn(len(x)) / 5
     X = x.reshape(-1, 1)
 
-    gam = LinearGAM(s(0, n_splines=5)).fit(X, y)
+    gam = LinearGAM(s(0, n_splines=10)).fit(X, y)
