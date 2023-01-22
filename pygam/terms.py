@@ -16,6 +16,11 @@ from pygam.penalties import CONSTRAINTS, PENALTIES
 from pygam.utils import b_spline_basis, check_param, flatten, gen_edge_knots, isiterable, tensor_product
 
 
+from pygam.log import setup_custom_logger
+
+logger = setup_custom_logger(__name__)
+
+
 class Term(Core, metaclass=ABCMeta):
     def __init__(
         self,
@@ -327,10 +332,12 @@ class Term(Core, metaclass=ABCMeta):
         -------
         P : sparse CSC matrix containing the model penalties in quadratic form
         """
+        logger.debug(f"Building penalty matrix for term: {self.get_params()}")
+
         if self.isintercept:
             return np.array([[0.0]])
 
-        Ps = []
+        penalty_matrices = []
         for penalty, lam in zip(self.penalties, self.lam):
 
             if penalty == "auto":
@@ -344,10 +351,14 @@ class Term(Core, metaclass=ABCMeta):
             if not callable(penalty):
                 raise TypeError(f"'penalty must be callable. Found: {penalty}'")
 
-            P = penalty(self.n_coefs, coef=None)  # penalties dont need coef
-            Ps.append(np.multiply(P, lam))
+            penalty_matrix = penalty(self.n_coefs)  # penalties dont need coef
+            penalty_matrices.append(np.multiply(penalty_matrix, np.sqrt(lam)))
 
-        return np.sum(Ps)
+        # Sum to a single (n_coefs, n_coefs) matrix
+        penalty_matrix = np.sum(penalty_matrices, axis=0)
+        assert isinstance(penalty_matrix, np.ndarray)
+        assert penalty_matrix.shape == (self.n_coefs, self.n_coefs)
+        return penalty_matrix
 
     def build_constraints(self, coef, constraint_lam, constraint_l2):
         """
@@ -1741,10 +1752,7 @@ class TermList(Core, MetaTermMixin):
         -------
         P : sparse CSC matrix containing the model penalties in quadratic form
         """
-        P = []
-        for term in self._terms:
-            P.append(term.build_penalties())
-        return sp.sparse.block_diag(P)
+        return sp.sparse.block_diag([term.build_penalties() for term in self._terms])
 
     def build_constraints(self, coefs, constraint_lam, constraint_l2):
         """
@@ -1860,3 +1868,29 @@ TERMS = {
     "tensor_term": TensorTerm,
     "term_list": TermList,
 }
+
+
+if __name__ == "__main__":
+
+    spline = s(0, n_splines=10, lam=1)
+    x = np.arange(10)
+
+    assert np.allclose(spline.build_penalties() @ x, 0)
+
+    ans = np.array([1.0, 1.5, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 1.5, 1.0])
+    assert np.allclose(spline.build_penalties() @ x**2, ans)
+    print(spline.build_penalties() @ x**2)
+
+    from pygam.penalties import FDMatrix
+
+    D = FDMatrix.forward_diff(10, periodic=False)
+    second_order_D = D @ D
+    print(second_order_D @ np.arange(10) ** 2)
+
+    D = FDMatrix.backward_diff(10, periodic=False)
+    second_order_D = D @ D
+    print(second_order_D @ np.arange(10) ** 2)
+
+    CD = FDMatrix.centered_diff(10, periodic=False)
+    second_order_CD = CD @ CD
+    print(second_order_CD @ np.arange(10) ** 2)

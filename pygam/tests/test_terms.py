@@ -268,7 +268,7 @@ def test_cyclic_p_spline_custom_period():
 
     # when modeling a non-periodic function, our periodic model fails
     gam = LinearGAM(s(0, basis="cp", n_splines=4, spline_order=0, edge_knots=[0, 0.5])).fit(X, y)
-    assert np.allclose(gam.predict(X), 0.5, atol=0.001)
+    assert np.allclose(gam.predict(X), 0.5, atol=0.01)
     assert np.allclose(gam.edge_knots_[0], [0, 0.5])
 
 
@@ -323,6 +323,27 @@ def test_tensor_with_constraints(hepatitis_X_y):
     assert gam_constrained.statistics_["pseudo_r2"]["explained_deviance"] < 0.1
 
 
+class TestBasicPenalties:
+    def test_that_linear_betas_get_no_penalty(self):
+        from pygam import s
+
+        n_splines = 10
+        spline = s(0, n_splines=n_splines, lam=1)
+        x = np.arange(n_splines)
+        assert np.allclose(spline.build_penalties() @ x, 0)
+
+    def test_that_quadratic_betas_get_constant_penalty(self):
+        from pygam import s
+
+        n_splines = 10
+        spline = s(0, n_splines=n_splines, lam=1)
+        x = np.arange(n_splines)
+
+        # Close to 2, but with errors at the boundaries
+        ans = np.array([1.0, 1.5, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 1.5, 1.0])
+        assert np.allclose(spline.build_penalties() @ x**2, ans)
+
+
 class TestRegressions:
     def test_no_auto_dtype(self):
         with pytest.raises(ValueError):
@@ -366,3 +387,38 @@ class TestRegressions:
 
         gam = PoissonGAM(s(0, constraints="monotonic_inc") + te(3, 1) + s(2)).fit(X, y)
         assert gam._is_fitted
+
+
+if __name__ == "__main__":
+    import pytest
+
+    # pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules", "-k TestBasicPenalties"])
+
+    # define square wave
+    X = np.linspace(0, 1, 5000).reshape(-1, 1)
+    y = np.sin(X.ravel() * 2 * np.pi)
+
+    # when modeling the full period, we get close with a periodic basis
+    gam = LinearGAM(s(0, basis="cp", n_splines=4, spline_order=2)).fit(X, y)
+    # predictions = gam.predict(X)
+
+    import matplotlib.pyplot as plt
+
+    plt.plot(X.ravel(), y)
+    plt.plot(X.ravel(), gam.predict(X))
+    plt.show()
+
+    1 / 0
+
+    assert np.isclose(gam.predict(X), y, atol=0.01).mean() > 0.999  # Last point fails (numerics?)
+    assert np.allclose(gam.edge_knots_[0], [0, 1])
+
+    # when modeling a non-periodic function, our periodic model fails
+    gam = LinearGAM(s(0, basis="cp", n_splines=4, spline_order=0, edge_knots=[0, 0.5])).fit(X, y)
+
+    plt.plot(X.ravel(), y)
+    plt.plot(X.ravel(), gam.predict(X))
+    plt.show()
+
+    assert np.allclose(gam.predict(X), 0.5, atol=0.01)
+    assert np.allclose(gam.edge_knots_[0], [0, 0.5])

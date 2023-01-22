@@ -22,7 +22,7 @@ from pygam.distributions import (
     PoissonDist,
 )
 from pygam.links import LINKS, IdentityLink, InverseLink, InvSquaredLink, Link, LogitLink, LogLink
-from pygam.optimization import _cholesky, cholesky
+from pygam.optimization import _cholesky, cholesky, BetaOptimizer
 from pygam.penalties import (
     CONSTRAINTS,
     PENALTIES,
@@ -695,215 +695,6 @@ class GAM(Core, MetaTermMixin):
         # not sure if this is faster...
         # return np.linalg.pinv(modelmat.T.dot(modelmat)).dot(modelmat.T.dot(y_))
 
-    def _pirls(self):
-        """
-        Performs stable PIRLS iterations to estimate GAM coefficients
-
-        https://www.jstor.org/stable/20203839
-        section 6.1.1 in Wood on PIRLS   (p251)
-        section 3.1.2 in Wood on fitting (p107)
-
-        Parameters
-        ---------
-        X : array-like of shape (n_samples, m_features)
-            containing input data
-        Y : array-like of shape (n,)
-            containing target data
-        weights : array-like of shape (n,)
-            containing sample weights
-
-        Returns
-        -------
-        None
-        """
-        if not all(hasattr(self, name) for name in ("X_", "y_", "weights_")):
-            raise ValueError("Fit model...")
-
-        # Get data
-        X, Y, weights = self.X_, self.y_, self.weights_
-
-        # Builds a model matrix out of the spline basis for each feature
-        modelmat = self._modelmat(X)
-        num_observations, num_splines = modelmat.shape
-
-        # initialize GLM coefficients if model is not yet fitted
-        if not self._is_fitted or len(self.coef_) != self.terms.n_coefs or not np.isfinite(self.coef_).all():
-            self.coef_ = self._initial_estimate(Y, modelmat)
-
-        if not np.isfinite(self.coef_).all():
-            raise ValueError("Coefficient should be well-behaved.")
-
-        # Penalty matrix of size (num_splines, num_splines)
-        P = self._P()
-        S = sp.sparse.diags(np.ones(num_splines) * np.sqrt(EPS))  # improve condition
-
-        # if we dont have any constraints, then do cholesky now
-        if not self.terms.hasconstraint:
-
-            # TODO: Why is sparse flag always false?
-            E = _cholesky(
-                S + P, constraint_l2=self._constraint_l2, constraint_l2_max=self._constraint_l2_max, sparse=False
-            )
-
-        min_n_m = min(num_splines, num_observations)
-
-        for iteration in range(1, self.max_iter + 1):
-            logger.info(f"PIRLS iteration {iteration}")
-
-            # Recompute cholesky if needed. The constraint matrix C is a
-            # function of the current parameter estimates
-            if self.terms.hasconstraint:
-
-                # TODO: Why is sparse flag always false?
-                E = _cholesky(
-                    S + P + self._C(),
-                    constraint_l2=self._constraint_l2,
-                    constraint_l2_max=self._constraint_l2_max,
-                    sparse=False,
-                )
-
-            # forward pass
-            y = deepcopy(Y)  # Because we mask it later
-            lp = self._linear_predictor(modelmat=modelmat)
-            mu = self.link.mu(lp, self.distribution)
-
-            # Create weight vector
-            # w = (self.link.gradient(mu, self.distribution) ** 2 * self.distribution.V(mu=mu) * weights**-1) ** -0.5
-            # w = np.sqrt(weights) / (np.sqrt(self.distribution.V(mu=mu)) * self.link.gradient(mu, self.distribution))
-            w = self._W(mu, weights, y=y)
-            mask = (np.abs(w) >= np.sqrt(EPS)) * np.isfinite(w)
-
-            # Mask variables
-            y = y[mask]
-            lp = lp[mask]
-            mu = mu[mask]
-            w = w[mask]
-
-            # PIRLS Wood pg 183
-
-            # pseudo_data = W.dot(self._pseudo_data(y, lp, mu))
-            pseudo_data = self._pseudo_data(y, lp, mu) * w
-
-            # log on-loop-start stats
-            self._on_loop_start(vars())
-
-            # WB = (modelmat[mask, :].A.T * w).T
-            WB = (sp.sparse.diags(w) * modelmat[mask, :]).A
-            Q, R = np.linalg.qr(WB)  # 'A' transforms scipy.sparse._csr.csr_matrix -> numpy.ndarray
-
-            if not np.isfinite(Q).all() or not np.isfinite(R).all():
-                raise ValueError("QR decomposition produced NaN or Inf. Check X data.")
-
-            # need to recompute the number of singular values
-            min_n_m = min(num_splines, num_observations, mask.sum())
-            Dinv = np.zeros((num_splines, min_n_m))
-
-            # SVD
-            U, d, Vt = np.linalg.svd(np.vstack([R, E]))
-            # svd_mask = d <= (d.max() * np.sqrt(EPS))  # mask out small singular values
-
-            np.fill_diagonal(Dinv, 1 / d)  # invert the singular values
-            U1 = U[:min_n_m, :min_n_m]  # keep only top corner of U
-
-            # update coefficients
-            # print(Dinv.shape)
-            # print(Vt.T.shape)
-
-            B = Vt.T.dot(Dinv).dot(U1.T).dot(Q.T)
-            # B2 = (Dinv2 * Vt.T).dot(U1.T).dot(Q.T)
-
-            # assert np.allclose(B, B2)
-
-            coef_new = B.dot(pseudo_data).flatten()
-            diff = np.linalg.norm(self.coef_ - coef_new) / np.linalg.norm(coef_new)
-            self.coef_ = coef_new  # update
-
-            # log on-loop-end stats
-            self._on_loop_end(vars())
-
-            # check convergence
-            if diff < self.tol:
-                logger.info(f"PIRLS converged {diff} < {self.tol}")
-                break
-
-        # estimate statistics even if not converged
-        self._estimate_model_statistics(B=B, weights=weights, U1=U1)
-        if diff < self.tol:
-            return
-
-        return
-
-    def _pirls_naive(self, X, y):
-        """
-        Performs naive PIRLS iterations to estimate GAM coefficients
-
-        Parameters
-        ---------
-        X : array-like of shape (n_samples, m_features)
-            containing input data
-        y : array-like of shape (n,)
-            containing target data
-
-        Returns
-        -------
-        None
-        """
-        modelmat = self._modelmat(X)  # build a basis matrix for the GLM
-        m = modelmat.shape[1]
-
-        # initialize GLM coefficients
-        if not self._is_fitted or len(self.coef_) != sum(self._n_coeffs):
-            self.coef_ = np.ones(m) * np.sqrt(EPS)  # allow more training
-
-        P = self._P()  # create penalty matrix
-        P += sp.sparse.diags(np.ones(m) * np.sqrt(EPS))  # improve condition
-
-        # Fisher weights
-        alpha = 1
-
-        # Step 1: Initialize mu and eta
-        beta = 0
-        mu = y + np.sqrt(EPS)
-        eta = self.link.link(mu, dist=self.distribution)
-        assert np.isfinite(eta).all()
-
-        for iteration in range(1, self.max_iter + 1):
-            logger.info(f"PIRLS iteration {iteration}")
-
-            # Step 2: Compute pseudodata z and iterative weights w
-            # z = lp + (y - mu) * self.link.gradient(mu, self.distribution)
-            z = mu + (y - mu) * self.link.gradient(mu, self.distribution) / alpha
-            g_prime = self.link.gradient(mu, self.distribution)
-            w = alpha / (g_prime**2 * self.distribution.V(mu=mu))
-            assert np.all(w > 0)
-
-            # Step 3: Find beta, the minimizer of the least squares objective
-            # |z - X * beta|^2_W + |beta|^2_P
-            modelmat_w = (modelmat.A.T * np.sqrt(w)).T
-
-            P_squared = sp.linalg.cholesky(P.A)
-            lhs_stacked = np.vstack((modelmat_w, P_squared))
-            rhs_stacked = np.hstack((np.sqrt(w) * z, np.zeros(P.shape[0])))
-
-            beta_new, residuals, rank, singular_values = sp.linalg.lstsq(lhs_stacked, rhs_stacked)
-
-            # Update eta and mu
-            eta = modelmat.A @ beta_new
-            mu = self.link.mu(eta, dist=self.distribution)
-
-            relative_error = np.linalg.norm(beta - beta_new) / np.linalg.norm(beta_new)
-
-            # Convergence
-            print("Convergence", relative_error)
-
-            beta = beta_new
-            self.coef_ = beta  # update
-
-            if relative_error < self.tol:
-                return
-
-        raise Exception("Did not converge")
-
     def _on_loop_start(self, variables):
         """
         performs on-loop-start actions like callbacks
@@ -992,13 +783,8 @@ class GAM(Core, MetaTermMixin):
         self.statistics_ = {"n_samples": len(y), "m_features": X.shape[1]}
 
         # optimize
-        # self._pirls_naive(X, y)
-        self._pirls()
+        BetaOptimizer(self).stable_pirls_negative_weights()
 
-        # if self._opt == 0:
-        #     self._pirls(X, y, weights)
-        # if self._opt == 1:
-        #     self._pirls_naive(X, y)
         return self
 
     def score(self, X, y, weights=None):
@@ -1071,7 +857,7 @@ class GAM(Core, MetaTermMixin):
         sign = np.sign(y - mu)
         return sign * self.distribution.deviance(y, mu, weights=weights, scaled=scaled) ** 0.5
 
-    def _estimate_model_statistics(self, B=None, weights=None, U1=None):
+    def _estimate_model_statistics(self, B=None, U1=None):
         """
         method to compute all of the model statistics
 
@@ -1107,30 +893,10 @@ class GAM(Core, MetaTermMixin):
         """
         modelmat = self._modelmat(self.X_)
         y = self.y_
+        weights = self.weights_
 
         lp = self._linear_predictor(modelmat=modelmat)
         mu = self.link.mu(lp, self.distribution)
-
-        self.statistics_["edof_per_coef"] = np.sum(U1**2, axis=1)
-        self.statistics_["edof"] = self.statistics_["edof_per_coef"].sum()
-
-        if not self.distribution._known_scale:
-            self.distribution.scale = self.distribution.phi(y=y, mu=mu, edof=self.statistics_["edof"], weights=weights)
-
-        # With
-        # X_1 = modelmat.A
-        # W_1 = np.diag(w**2)
-        # S_1 = (S + P + self._C()).A
-        # we have
-        #             (equation 6.3 in wood)
-        # edof = np.diagonal(np.linalg.inv(X_1.T @ W_1 @ X_1 +S_1) @ X_1.T @ W_1 @ X_1)
-        # edof = np.diagonal(U1.dot(U1.T))
-        # edof = np.sum(U1**2, axis=1)
-
-        print(type(B), type(self.distribution.scale))
-        self.statistics_["cov"] = (
-            B.dot(B.T)
-        ) * self.distribution.scale  # parameter covariances. no need to remove a W because we are using W^2. Wood pg 184
 
         self.statistics_["scale"] = self.distribution.scale
         self.statistics_["se"] = self.statistics_["cov"].diagonal() ** 0.5

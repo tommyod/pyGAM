@@ -3,6 +3,7 @@ Penalty matrix generators
 """
 
 import warnings
+import functools
 
 import numpy as np
 import scipy as sp
@@ -38,12 +39,14 @@ class FDMatrix:
         array([[-1.,  1.,  0.,  0.],
                [ 0., -1.,  1.,  0.],
                [ 0.,  0., -1.,  1.],
-               [ 0.,  0.,  0., -1.]])
+               [ 0.,  0.,  0.,  0.]])
         """
         if periodic:
             return sp.linalg.circulant([-1] + [0] * (n - 2) + [1]).astype(float)
         else:
-            return (np.eye(n, k=1) - np.eye(n)).astype(float)
+            D = (np.eye(n, k=1) - np.eye(n)).astype(float)
+            D[-1, -1] = 0
+            return D
 
     @staticmethod
     def backward_diff(n, periodic=True):
@@ -69,7 +72,7 @@ class FDMatrix:
                [ 0., -1.,  1.,  0.],
                [ 0.,  0., -1.,  1.]])
         >>> FDMatrix.backward_diff(4, periodic=False)
-        array([[ 1.,  0.,  0.,  0.],
+        array([[ 0.,  0.,  0.,  0.],
                [-1.,  1.,  0.,  0.],
                [ 0., -1.,  1.,  0.],
                [ 0.,  0., -1.,  1.]])
@@ -77,11 +80,15 @@ class FDMatrix:
         if periodic:
             return sp.linalg.circulant([1] + [0] * (n - 2) + [-1]).T.astype(float)
         else:
-            return (np.eye(n) - np.eye(n, k=-1)).astype(float)
+            D = (np.eye(n) - np.eye(n, k=-1)).astype(float)
+            D[0, 0] = 0
+            return D
 
     @classmethod
     def centered_diff(cls, n, periodic=True):
         """Create a centered difference matrix D such that f' = D f.
+
+        At the boundaries, forward and backward diffs are used.
 
         Parameters
         ----------
@@ -104,11 +111,13 @@ class FDMatrix:
                [ 0. ,  0. , -0.5,  0. ,  0.5,  0. ],
                [ 0. ,  0. ,  0. , -0.5,  0. ,  0.5],
                [ 0.5,  0. ,  0. ,  0. , -0.5,  0. ]])
-        >>> FDMatrix.backward_diff(4, periodic=False)
-        array([[ 1.,  0.,  0.,  0.],
-               [-1.,  1.,  0.,  0.],
-               [ 0., -1.,  1.,  0.],
-               [ 0.,  0., -1.,  1.]])
+        >>> FDMatrix.centered_diff(6, False)
+        array([[-1. ,  1. ,  0. ,  0. ,  0. ,  0. ],
+               [-0.5,  0. ,  0.5,  0. ,  0. ,  0. ],
+               [ 0. , -0.5,  0. ,  0.5,  0. ,  0. ],
+               [ 0. ,  0. , -0.5,  0. ,  0.5,  0. ],
+               [ 0. ,  0. ,  0. , -0.5,  0. ,  0.5],
+               [ 0. ,  0. ,  0. ,  0. , -1. ,  1. ]])
         """
         if periodic:
             return (cls.forward_diff(n, periodic) + cls.backward_diff(n, periodic)) / 2.0
@@ -129,7 +138,7 @@ class FDMatrix:
 # =============================================================================
 
 
-def derivative(n, coef, derivative=2, periodic=False):
+def derivative(n, derivative=2, periodic=False):
     """
     Builds a penalty matrix for P-Splines with continuous features.
     Penalizes the squared differences between basis coefficients.
@@ -172,16 +181,18 @@ def derivative(n, coef, derivative=2, periodic=False):
         D = D[derivative:-derivative, derivative:-derivative]
 
     # print(f"Shape of D: {D.shape}")
+    # print(D.A)
+    return D.A
     return D.dot(D.T).tocsc()
 
 
-def periodic(n, coef, derivative=2, _penalty=derivative):
+def periodic(n, derivative=2, _penalty=derivative):
     # return FDMatrix.derivative(n, order=derivative, periodic=True)
 
-    return _penalty(n, coef, derivative=derivative, periodic=True)
+    return _penalty(n, derivative=derivative, periodic=True)
 
 
-def l2(n, coef):
+def l2(n):
     """
     Builds a penalty matrix for P-Splines with categorical features.
     Penalizes the squared value of each basis coefficient.
@@ -198,7 +209,7 @@ def l2(n, coef):
     -------
     penalty matrix : sparse csc matrix of shape (n,n)
     """
-    return sp.sparse.eye(n).tocsc()
+    return np.eye(n)
 
 
 # =============================================================================
@@ -216,7 +227,6 @@ def monotonic_inc(n, coef):
     # in the minimization problem
     D = FDMatrix.backward_diff(n, periodic=False)
     mask = np.diff(coef) > 0
-    print(coef, coef.shape)
     mask = np.hstack(([True], mask))
     D[mask, :] = 0
     return D
@@ -341,7 +351,7 @@ def none(n, coef):
     -------
     penalty matrix : sparse csc matrix of shape (n,n)
     """
-    return sp.sparse.csc_matrix((n, n))
+    return np.zeros((n, n))
 
 
 # =============================================================================
@@ -421,7 +431,19 @@ def sparse_diff(array, n=1, axis=-1):
     return A[slice1] - A[slice2]
 
 
-PENALTIES = {"auto": "auto", "derivative": derivative, "l2": l2, "none": none, "periodic": periodic}
+PENALTIES = {
+    "auto": "auto",
+    "derivative": functools.partial(FDMatrix.derivative, order=2, periodic=False),
+    "l2": l2,
+    "none": none,
+    "periodic": functools.partial(FDMatrix.derivative, order=2, periodic=True),
+}
+
+
+# =============================================================================
+# PENALTIES
+# =============================================================================
+
 
 CONSTRAINTS = {
     "convex": convex,
@@ -438,31 +460,33 @@ if __name__ == "__main__":
 
     import time
 
-    for penalty_name, penalty_func in PENALTIES.items():
+    if False:
 
-        if not callable(penalty_func):
-            continue
+        for penalty_name, penalty_func in PENALTIES.items():
 
-        st = time.perf_counter()
-        penalty_func(1000, np.random.randn(1000))
-        elapsed = round(time.perf_counter() - st, 8)
-        print(f"{penalty_name} in {elapsed} seconds")
+            if not callable(penalty_func):
+                continue
 
-    for penalty_name, penalty_func in CONSTRAINTS.items():
+            st = time.perf_counter()
+            penalty_func(1000, np.random.randn(1000))
+            elapsed = round(time.perf_counter() - st, 8)
+            print(f"{penalty_name} in {elapsed} seconds")
 
-        if not callable(penalty_func):
-            continue
+        for penalty_name, penalty_func in CONSTRAINTS.items():
 
-        st = time.perf_counter()
-        penalty_func(1000, np.random.randn(1000))
-        elapsed = round(time.perf_counter() - st, 8)
-        print(f"{penalty_name} in {elapsed} seconds")
+            if not callable(penalty_func):
+                continue
 
-    x = np.linspace(0, 2 * np.pi, num=2**10, endpoint=False)
-    y = np.sin(x)
-    dx = x[1] - x[0]
-    n = len(x)
-    periodic = True
-    D = FDMatrix.centered_diff(n, periodic=periodic) / dx
+            st = time.perf_counter()
+            penalty_func(1000, np.random.randn(1000))
+            elapsed = round(time.perf_counter() - st, 8)
+            print(f"{penalty_name} in {elapsed} seconds")
 
-    assert np.allclose(np.cos(x), D @ y)
+        x = np.linspace(0, 2 * np.pi, num=2**10, endpoint=False)
+        y = np.sin(x)
+        dx = x[1] - x[0]
+        n = len(x)
+        periodic = True
+        D = FDMatrix.centered_diff(n, periodic=periodic) / dx
+
+        assert np.allclose(np.cos(x), D @ y)
