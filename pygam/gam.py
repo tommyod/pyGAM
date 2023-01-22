@@ -782,7 +782,7 @@ class GAM(Core, MetaTermMixin):
             # log on-loop-start stats
             self._on_loop_start(vars())
 
-            WB = (modelmat[mask, :].A.T * w).T
+            # WB = (modelmat[mask, :].A.T * w).T
             WB = (sp.sparse.diags(w) * modelmat[mask, :]).A
             Q, R = np.linalg.qr(WB)  # 'A' transforms scipy.sparse._csr.csr_matrix -> numpy.ndarray
 
@@ -790,18 +790,24 @@ class GAM(Core, MetaTermMixin):
                 raise ValueError("QR decomposition produced NaN or Inf. Check X data.")
 
             # need to recompute the number of singular values
-            min_n_m = np.min([num_splines, num_observations, mask.sum()])
+            min_n_m = min(num_splines, num_observations, mask.sum())
             Dinv = np.zeros((num_splines, min_n_m))
 
             # SVD
             U, d, Vt = np.linalg.svd(np.vstack([R, E]))
             # svd_mask = d <= (d.max() * np.sqrt(EPS))  # mask out small singular values
 
-            np.fill_diagonal(Dinv, d**-1)  # invert the singular values
+            np.fill_diagonal(Dinv, 1/d)  # invert the singular values
             U1 = U[:min_n_m, :min_n_m]  # keep only top corner of U
 
             # update coefficients
+            print(Dinv.shape)
+            print(Vt.T.shape)
+            
             B = Vt.T.dot(Dinv).dot(U1.T).dot(Q.T)
+            B2 = (Vt.T * 1/d).dot(U1.T).dot(Q.T)
+            assert np.allclose(B, B2)
+            
             coef_new = B.dot(pseudo_data).flatten()
             diff = np.linalg.norm(self.coef_ - coef_new) / np.linalg.norm(coef_new)
             self.coef_ = coef_new  # update
