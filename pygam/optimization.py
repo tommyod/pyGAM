@@ -62,53 +62,49 @@ class BetaOptimizer:
         in 'Generalized Additive Models' by Simon N. Wood (2nd edition)
 
         """
+        logger.info("--------------------------------------------------")
+        logger.info("Starting algorithm 'stable_pirls_negative_weights'")
+
         num_observations, num_splines = self.modelmat.shape
         modelmat = self.modelmat
         gam = self.gam
         Y, weights = gam.y_, gam.weights_
 
         # Penalty matrix of size (num_splines, num_splines)
-        P = gam._P()
-        S = sp.sparse.diags(np.ones(num_splines) * np.sqrt(EPS))  # improve condition
+        # S = sp.sparse.diags(np.ones(num_splines) * np.sqrt(EPS)).A  # improve condition
+
+        P = gam._P().A  # Spline penalties (typically second derivative)
+        ID = gam._identifiability_constraints()  # Identifiability constraints (soft sum-to-zero)
 
         # if we dont have any constraints, then do cholesky now
         if not gam.terms.hasconstraint:
-
-            E = P.A
-            print(E.shape)
+            E = np.vstack((P, ID))
+            logger.debug(f"No constraints. Creating penalty of size {E.shape} before PIRLS loop.")
 
         min_n_m = min(num_splines, num_observations)
 
         for iteration in range(1, gam.max_iter + 1):
-            logger.info(f"PIRLS iteration {iteration}")
+            logger.info(f"--------------- PIRLS iteration {iteration} ---------------")
 
-            # Recompute cholesky if needed. The constraint matrix C is a
-            # function of the current parameter estimates
+            # If the model has constraints (e.g. monotonic increasing),
+            # then these constraints are function of the current beta values
+            # and must be updated in each inner loop
             if gam.terms.hasconstraint:
-
-                # TODO: Why is sparse flag always false?
-                E = _cholesky(
-                    S + P.T.dot(P) + gam._C(),
-                    constraint_l2=gam._constraint_l2,
-                    constraint_l2_max=gam._constraint_l2_max,
-                    sparse=False,
-                )
-
-            print(P.A.round(2))
+                E = np.vstack((P + gam._C().A, ID))
 
             # forward pass
-            y = deepcopy(Y)  # Because we mask it later
+            y = Y.copy()  # Because we mask it later
             lp = gam._linear_predictor(modelmat=modelmat)
             mu = gam.link.mu(lp, gam.distribution)
 
-            # Create weight vector
-            # w = (gam.link.gradient(mu, gam.distribution) ** 2 * gam.distribution.V(mu=mu) * weights**-1) ** -0.5
-            # w = np.sqrt(weights) / (np.sqrt(gam.distribution.V(mu=mu)) * gam.link.gradient(mu, gam.distribution))
+            # Create (square root of) the weight vector
             w = gam._W(mu, weights, y=y)
-            mask = (np.abs(w) >= np.sqrt(EPS)) * np.isfinite(w)
+            assert np.all((w >= 0) * np.isfinite(w)), "Weights must be >= 0 and finite"
+            # mask = (np.abs(w) >= np.sqrt(EPS)) * np.isfinite(w)
+            # logger.debug(f"Strange results on {(~mask).sum()} weights.")
 
             # Mask variables
-            y, lp, mu, w = y[mask], lp[mask], mu[mask], w[mask]
+            # y, lp, mu, w = y[mask], lp[mask], mu[mask], w[mask]
 
             pseudo_data = gam._pseudo_data(y, lp, mu) * w
             logger.debug(f"Mean value of pseudo data: {pseudo_data.mean()}")
@@ -116,33 +112,28 @@ class BetaOptimizer:
             # log on-loop-start stats
             gam._on_loop_start(vars())
 
-            # WB = (modelmat[mask, :].A.T * w).T
-            WB = (sp.sparse.diags(w) * modelmat[mask, :]).A
-            Q, R = np.linalg.qr(WB)  # 'A' transforms scipy.sparse._csr.csr_matrix -> numpy.ndarray
+            WB = (modelmat.A.T * w).T
+            Q, R = np.linalg.qr(WB)
 
             if not np.isfinite(Q).all() or not np.isfinite(R).all():
                 raise ValueError("QR decomposition produced NaN or Inf. Check X data.")
 
             # need to recompute the number of singular values
-            min_n_m = min(num_splines, num_observations, mask.sum())
-            Dinv = np.zeros((num_splines, min_n_m))
+            min_n_m = min(num_splines, num_observations)
+            # Dinv = np.zeros((num_splines, min_n_m))
 
             # SVD
-            print(f"SV-tacking R with shape {R.shape} over E with shape {E.shape}")
-            U, d, Vt = np.linalg.svd(np.vstack([R, E]))
-            # svd_mask = d <= (d.max() * np.sqrt(EPS))  # mask out small singular values
+            logger.debug(f"SV-tacking R with shape {R.shape} over E with shape {E.shape}")
+            U, diag, Vt = np.linalg.svd(np.vstack([R, E]))
+            diag_inv = 1 / diag
+            # svd_mask = diag <= (d.max() * np.sqrt(EPS))  # mask out small singular values
 
-            np.fill_diagonal(Dinv, 1 / d)  # invert the singular values
+            # Mask out if there are more splines than observations
             U1 = U[:min_n_m, :min_n_m]  # keep only top corner of U
+            Vt = Vt[:min_n_m, :]  # keep only tom rows of V.T
+            diag_inv = diag_inv[:min_n_m]
 
-            # update coefficients
-            # print(Dinv.shape)
-            # print(Vt.T.shape)
-
-            B = Vt.T.dot(Dinv).dot(U1.T).dot(Q.T)
-            # B2 = (Dinv2 * Vt.T).dot(U1.T).dot(Q.T)
-
-            # assert np.allclose(B, B2)
+            B = (diag_inv * Vt.T).dot(U1.T).dot(Q.T)
 
             coef_new = B.dot(pseudo_data).flatten()
             diff = np.linalg.norm(gam.coef_ - coef_new) / np.linalg.norm(coef_new)
@@ -362,11 +353,31 @@ def cholesky(A, sparse=True):
 
 
 if __name__ == "__main__":
-
     np.random.seed(4)
-    X = np.random.randn(100, 2)
-    y = np.sin(X[:, 0] * 2.5) + X[:, 1] ** 2 + np.random.randn(100) / 5 + 100
+    X = np.random.rand(1000, 1)
+    X = np.sort(X, axis=0)
+    y = np.sin(X[:, 0] * 0.99 * np.pi) + np.random.randn(X.shape[0]) / 5 + 100
 
     from pygam import LinearGAM, s, l
 
-    gam = LinearGAM(s(0, n_splines=4, lam=1) + s(1, n_splines=4, lam=1)).fit(X, y)
+    gam = LinearGAM(s(0, n_splines=8, lam=1, constraints="monotonic_inc"), max_iter=100).fit(X, y)
+
+    import matplotlib.pyplot as plt
+
+    plt.scatter(X[:, 0], y)
+    plt.plot(X[:, 0], gam.predict(X), color="black", lw=5, alpha=0.66)
+
+    if False:
+
+        np.random.seed(4)
+        X = np.random.randn(100, 2)
+        y = np.sin(X[:, 0] * 2.5) + X[:, 1] ** 2 + np.random.randn(100) / 5 + 100
+
+        from pygam import LinearGAM, s, l
+
+        gam = LinearGAM(s(0, n_splines=4, lam=1, constraints=None) + s(1, n_splines=4, lam=1)).fit(X, y)
+
+        import matplotlib.pyplot as plt
+
+        plt.scatter(X[:, 0], y)
+        plt.scatter(X[:, 0], gam.predict(X))

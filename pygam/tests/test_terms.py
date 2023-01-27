@@ -396,7 +396,7 @@ if __name__ == "__main__":
 
     # define square wave
     X = np.linspace(0, 1, 5000).reshape(-1, 1)
-    y = np.sin(X.ravel() * 2 * np.pi)
+    y = np.sin(X.ravel() * 2 * np.pi) + 1000
 
     # when modeling the full period, we get close with a periodic basis
     gam = LinearGAM(s(0, basis="cp", n_splines=4, spline_order=2)).fit(X, y)

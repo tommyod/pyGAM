@@ -212,28 +212,104 @@ def l2(n):
     return np.eye(n)
 
 
+def no_penalty(n):
+    """
+    Build a matrix of zeros for features that should go unpenalized
+
+    Parameters
+    ----------
+    n : int
+        number of splines
+    coef : unused
+        for compatibility with constraints
+
+    Returns
+    -------
+    penalty matrix : sparse csc matrix of shape (n,n)
+    """
+    return np.zeros((n, n))
+
+
 # =============================================================================
 # CONSTRAINTS
 # =============================================================================
 
 
-def monotonic_inc(n, coef):
-    return monotonicity_(n, coef, increasing=True)
+def monotonic_inc(coef):
+    """Monotonic increasing constraint, penalizing decreases.
+
+
+    Parameters
+    ----------
+    coef : np.ndarray
+        Array of coefficients.
+
+    Returns
+    -------
+    D : np.ndarray
+        Matrix such that penalty = (D @ coef).dot(D @ coef).
+
+    Examples
+    --------
+    >>> a = np.array([1, 2, 3, 4])
+    >>> monotonic_inc(a) @ a
+    array([0., 0., 0., 0.])
+    >>> a = np.array([1, 2, 0, 4])
+    >>> monotonic_inc(a) @ a
+    array([ 0.,  0., -2.,  0.])
+    >>> a = np.array([0, 2, 3, 4])
+    >>> monotonic_inc(a) @ a
+    array([0., 0., 0., 0.])
+    >>> a = np.array([1, 2, 3, 0])
+    >>> monotonic_inc(a) @ a
+    array([ 0.,  0.,  0., -3.])
+
+    """
+    # return monotonicity_(coef, increasing=True)
 
     coef = coef.ravel()
     # For an array   [1, 4,  3,  2, 5]
     # the penalty is [0, 0, -1, -1, 0]
     # and this encourages elements corresponding to 3 and 2 to grow
     # in the minimization problem
-    D = FDMatrix.backward_diff(n, periodic=False)
+    D = FDMatrix.backward_diff(len(coef), periodic=False)
     mask = np.diff(coef) > 0
     mask = np.hstack(([True], mask))
     D[mask, :] = 0
     return D
 
 
-def monotonic_dec(n, coef):
-    return monotonicity_(n, coef, increasing=False)
+def monotonic_dec(coef):
+    """
+
+
+    Parameters
+    ----------
+    coef : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+
+    Examples
+    --------
+    >>> a = np.array([4, 3, 2, 1])
+    >>> monotonic_dec(a) @ a
+    array([0., 0., 0., 0.])
+    >>> a = np.array([4, 3, 0, 1])
+    >>> monotonic_dec(a) @ a
+    array([ 0.,  0., -1.,  0.])
+    >>> a = np.array([4, 3, 2, 0])
+    >>> monotonic_dec(a) @ a
+    array([0., 0., 0., 0.])
+    >>> a = np.array([0, 3, 2, 1])
+    >>> monotonic_dec(a) @ a
+    array([-3.,  0.,  0.,  0.])
+
+    """
+    # return monotonicity_(coef, increasing=False)
 
     coef = coef.ravel()
     # For an array   [ 1, 4, 3,  2, 5]
@@ -242,22 +318,20 @@ def monotonic_dec(n, coef):
     # in the minimization problem
 
     # equals to -monotonic_inc(5, a[::-1]) @ a
-    D = FDMatrix.forward_diff(n, periodic=False)
+    D = FDMatrix.forward_diff(len(coef), periodic=False)
     mask = np.diff(coef) < 0
     mask = np.hstack((mask, [True]))
     D[mask, :] = 0
     return -D
 
 
-def monotonicity_(n, coef, increasing=True):
+def monotonicity_(coef, increasing=True):
     """
     Builds a penalty matrix for P-Splines with continuous features.
     Penalizes violation of monotonicity in the feature function.
 
     Parameters
     ----------
-    n : int
-        number of splines
     coef : array-like
         coefficients of the feature function
     increasing : bool, default: True
@@ -266,12 +340,7 @@ def monotonicity_(n, coef, increasing=True):
     -------
     penalty matrix : sparse csc matrix of shape (n,n)
     """
-
-    if n != len(coef.ravel()):
-        raise ValueError(
-            "dimension mismatch: expected n equals len(coef), "
-            "but found n = {}, coef.shape = {}.".format(n, coef.shape)
-        )
+    n = len(coef)
 
     if n == 1:
         # no monotonic penalty for constant functions
@@ -287,6 +356,7 @@ def monotonicity_(n, coef, increasing=True):
     derivative = 1
     D = sparse_diff(sp.sparse.identity(n).tocsc(), n=derivative) * mask
     # print(f"Shape of D: {D.shape}")
+    return D.A.T
     return D.dot(D.T).tocsc()
 
 
@@ -325,18 +395,75 @@ def convexity_(n, coef, convex=True):
     derivative = 2
     D = sparse_diff(sp.sparse.identity(n).tocsc(), n=derivative) * mask
     # print(f"Shape of D: {D.shape}")
-    return D.dot(D.T).tocsc()
+    return D.A.T
 
 
-def convex(n, coef):
-    return convexity_(n, coef, convex=True)
+def convex(coef):
+    """
 
 
-def concave(n, coef):
-    return convexity_(n, coef, convex=False)
+    Parameters
+    ----------
+    coef : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+
+    Examples
+    --------
+    >>> a = np.array([4, 10, 6])
+    >>> convex(a) @ a
+    array([0., 5., 0.])
 
 
-def none(n, coef):
+    """
+    if len(coef) <= 2:
+        return np.zeros(shape=(len(coef), len(coef)))
+
+    # return monotonicity_(coef, increasing=True)
+
+    coef = coef.ravel()
+    # For an array   [1, 4,  3,  2, 5]
+    # the penalty is [0, 0, -1, -1, 0]
+    # and this encourages elements corresponding to 3 and 2 to grow
+    # in the minimization problem
+    Db = FDMatrix.backward_diff(len(coef), periodic=False)
+    Df = FDMatrix.forward_diff(len(coef), periodic=False)
+    D = (Df @ Db) / 2
+    mask = np.diff(coef, n=2) > 0
+    mask = np.hstack(([True], mask, [True]))
+    D[mask, :] = 0
+    return -D
+
+    # return convexity_(n, coef, convex=True)
+
+
+def concave(coef):
+    if len(coef) <= 2:
+        return np.zeros(shape=(len(coef), len(coef)))
+
+    coef = coef.ravel()
+    # For an array   [ 1, 4, 3,  2, 5]
+    # the penalty is [-3, 0, 0, -3, 0]
+    # and this encourages elements corresponding to 3 and 2 to grow
+    # in the minimization problem
+
+    # equals to -monotonic_inc(5, a[::-1]) @ a
+    Db = FDMatrix.backward_diff(len(coef), periodic=False)
+    Df = FDMatrix.forward_diff(len(coef), periodic=False)
+    D = (Df @ Db) / 2
+    mask = np.diff(coef, n=2) < 0
+    mask = np.hstack(([True], mask, [True]))
+    D[mask, :] = 0
+    return -D
+
+    # return convexity_(n, coef, convex=False)
+
+
+def no_constraint(coef):
     """
     Build a matrix of zeros for features that should go unpenalized
 
@@ -351,45 +478,13 @@ def none(n, coef):
     -------
     penalty matrix : sparse csc matrix of shape (n,n)
     """
-    return np.zeros((n, n))
+    return np.eye(len(coef)) * 0
+    return sp.sparse.diags([0] * len(coef))
 
 
 # =============================================================================
 # OTHER
 # =============================================================================
-
-
-def wrap_penalty(p, fit_linear, linear_penalty=0.0):
-    """
-    tool to account for unity penalty on the linear term of any feature.
-
-    example:
-        p = wrap_penalty(derivative, fit_linear=True)(n, coef)
-
-    Parameters
-    ----------
-    p : callable.
-        penalty-matrix-generating function.
-    fit_linear : boolean.
-        whether the current feature has a linear term or not.
-    linear_penalty : float, default: 0.
-        penalty on the linear term
-
-    Returns
-    -------
-    wrapped_p : callable
-      modified penalty-matrix-generating function
-    """
-
-    def wrapped_p(n, *args):
-        if fit_linear:
-            if n == 1:
-                return sp.sparse.block_diag([linear_penalty], format="csc")
-            return sp.sparse.block_diag([linear_penalty, p(n - 1, *args)], format="csc")
-
-        return p(n, *args)
-
-    return wrapped_p
 
 
 def sparse_diff(array, n=1, axis=-1):
@@ -435,7 +530,7 @@ PENALTIES = {
     "auto": "auto",
     "derivative": functools.partial(FDMatrix.derivative, order=2, periodic=False),
     "l2": l2,
-    "none": none,
+    "none": no_penalty,
     "periodic": functools.partial(FDMatrix.derivative, order=2, periodic=True),
 }
 
@@ -450,43 +545,49 @@ CONSTRAINTS = {
     "concave": concave,
     "monotonic_inc": monotonic_inc,
     "monotonic_dec": monotonic_dec,
-    "none": none,
+    "none": no_constraint,
 }
 
 if __name__ == "__main__":
     import pytest
 
-    pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules"])
+    # pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules"])
 
-    import time
+    if True:
 
-    if False:
+        np.random.seed(1)
+        a = np.random.randn(20)
+        a = np.array([1, 5, 3, 2])
 
-        for penalty_name, penalty_func in PENALTIES.items():
+        constraint = convex
 
-            if not callable(penalty_func):
-                continue
+        import matplotlib.pyplot as plt
 
-            st = time.perf_counter()
-            penalty_func(1000, np.random.randn(1000))
-            elapsed = round(time.perf_counter() - st, 8)
-            print(f"{penalty_name} in {elapsed} seconds")
+        # plt.title(error_vec.dot(error_vec))
+        plt.plot(a)
+        plt.plot(constraint(a) @ a)
+        plt.show()
 
-        for penalty_name, penalty_func in CONSTRAINTS.items():
+        error_vec = constraint(a) @ a
+        while error_vec.dot(error_vec) > 1e-18:
 
-            if not callable(penalty_func):
-                continue
+            print(a)
+            print(error_vec)
+            print()
 
-            st = time.perf_counter()
-            penalty_func(1000, np.random.randn(1000))
-            elapsed = round(time.perf_counter() - st, 8)
-            print(f"{penalty_name} in {elapsed} seconds")
+            a = a - 1.1 * error_vec
 
-        x = np.linspace(0, 2 * np.pi, num=2**10, endpoint=False)
-        y = np.sin(x)
-        dx = x[1] - x[0]
-        n = len(x)
-        periodic = True
-        D = FDMatrix.centered_diff(n, periodic=periodic) / dx
+            import time
 
-        assert np.allclose(np.cos(x), D @ y)
+            time.sleep(0.01)
+
+            import matplotlib.pyplot as plt
+
+            plt.title(error_vec.dot(error_vec))
+            plt.plot(a)
+            plt.plot(constraint(a) @ a)
+            plt.show()
+
+            error_vec = constraint(a) @ a
+
+        assert np.allclose(error_vec, 0)

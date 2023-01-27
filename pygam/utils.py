@@ -421,12 +421,13 @@ def b_spline_basis(x, edge_knots, n_splines=20, spline_order=3, sparse=True, per
 
     # Use sklearn here
     # TODO: Support knots?
+    include_bias = True
     transformer = SplineTransformer(
-        n_knots=n_splines + 1 + (0 if periodic else -spline_order),
+        n_knots=n_splines + 2 - include_bias + (0 if periodic else -spline_order),
         degree=spline_order,
         knots="uniform",
         extrapolation="periodic" if periodic else "linear",
-        include_bias=True,
+        include_bias=include_bias,
         order="C",
     )
 

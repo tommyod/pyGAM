@@ -22,7 +22,7 @@ from pygam.distributions import (
     PoissonDist,
 )
 from pygam.links import LINKS, IdentityLink, InverseLink, InvSquaredLink, Link, LogitLink, LogLink
-from pygam.optimization import _cholesky, cholesky, BetaOptimizer
+from pygam.optimization import cholesky, BetaOptimizer
 from pygam.penalties import (
     CONSTRAINTS,
     PENALTIES,
@@ -32,8 +32,6 @@ from pygam.penalties import (
     l2,
     monotonic_dec,
     monotonic_inc,
-    none,
-    wrap_penalty,
 )
 from pygam.terms import (
     FactorTerm,
@@ -74,8 +72,6 @@ __all__ = [
     "monotonic_dec",
     "convex",
     "concave",
-    "none",
-    "wrap_penalty",
     "PENALTIES",
     "CONSTRAINTS",
     "Distribution",
@@ -235,9 +231,9 @@ class GAM(Core, MetaTermMixin):
             setattr(self, k, v)
 
         # internal settings
-        self._constraint_lam = 1e9  # regularization intensity for constraints
-        self._constraint_l2 = 1e-3  # diagononal loading to improve conditioning
-        self._constraint_l2_max = 1e-1  # maximum loading
+        self._constraint_lam = 1e8  # regularization intensity for constraints
+        # self._constraint_l2 = 1e-3  # diagononal loading to improve conditioning
+        # self._constraint_l2_max = 1e-1  # maximum loading
         # self._opt = 0 # use 0 for numerically stable optimizer, 1 for naive
         self._term_location = "terms"  # for locating sub terms
         # self._include = ['lam']
@@ -260,6 +256,13 @@ class GAM(Core, MetaTermMixin):
     #         self.terms.lam = value
     #     else:
     #         self._lam = value
+
+    def yield_terms_and_betas(self):
+        assert self._is_fitted
+        start_idx = 0
+        for term in self.terms:
+            yield term, self.coef_[start_idx : start_idx + term.n_coefs]
+            start_idx += term.n_coefs
 
     @property
     def _is_fitted(self):
@@ -528,45 +531,22 @@ class GAM(Core, MetaTermMixin):
 
         return self.terms.build_columns(X, term=term)
 
+    def _identifiability_constraints(self):
+        """Create a matrix C such that |C beta| imposes identifiability constraints."""
+        C = np.zeros(shape=(len(self.terms), sum([t.n_coefs for t in self.terms])), dtype=float)
+        start_idx = 0
+        for i, term in enumerate(self.terms):
+            if not term.isintercept:
+                C[i, start_idx : start_idx + term.n_coefs] = 1.0 / np.sqrt(len(term))
+            start_idx += term.n_coefs
+
+        return C
+
     def _P(self):
-        """
-        builds the GAM block-diagonal penalty matrix in quadratic form
-        out of penalty matrices specified for each feature.
-
-        each feature penalty matrix is multiplied by a lambda for that feature.
-        the first feature is the intercept.
-
-        so for m features:
-        P = block_diag[lam0 * P0, lam1 * P1, lam2 * P2, ... , lamm * Pm]
-
-
-        Parameters
-        ---------
-        None
-
-        Returns
-        -------
-        P : sparse CSC matrix containing the model penalties in quadratic form
-
-        """
         return self.terms.build_penalties()
 
     def _C(self):
-        """
-        builds the GAM block-diagonal constraint matrix in quadratic form
-        out of constraint matrices specified for each feature.
-
-        behaves like a penalty, but with a very large lambda value, ie 1e6.
-
-        Parameters
-        ---------
-        None
-
-        Returns
-        -------
-        C : sparse CSC matrix containing the model constraints in quadratic form
-        """
-        return self.terms.build_constraints(self.coef_, self._constraint_lam, self._constraint_l2)
+        return self.terms.build_constraints(self.coef_, self._constraint_lam)
 
     def _pseudo_data(self, y, lp, mu):
         """
@@ -619,33 +599,6 @@ class GAM(Core, MetaTermMixin):
         """
         # Section 6.1.1, list entry (2) in Wood
         return (self.link.gradient(mu, self.distribution) ** 2 * self.distribution.V(mu=mu) * weights**-1) ** -0.5
-
-    def _mask(self, weights):
-        """
-        identifies the mask at which the weights are
-            greater than sqrt(machine epsilon)
-        and
-            not NaN
-        and
-            not Inf
-
-
-        Parameters
-        ---------
-        weights : array-like of shape (n,)
-            containing weights in [0,1]
-
-        Returns
-        -------
-        mask : boolean np.array of shape (n,) of good weight values
-        """
-        mask = (np.abs(weights) >= np.sqrt(EPS)) * np.isfinite(weights)
-        if mask.sum() == 0:
-            raise OptimizationError(
-                "PIRLS optimization has diverged.\n"
-                + "Try increasing regularization, or specifying an initial value for self.coef_"
-            )
-        return mask
 
     def _initial_estimate(self, y, modelmat):
         """

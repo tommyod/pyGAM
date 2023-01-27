@@ -21,6 +21,9 @@ from pygam.log import setup_custom_logger
 logger = setup_custom_logger(__name__)
 
 
+EPS = np.finfo(np.float64).eps  # machine epsilon
+
+
 class Term(Core, metaclass=ABCMeta):
     def __init__(
         self,
@@ -352,7 +355,14 @@ class Term(Core, metaclass=ABCMeta):
                 raise TypeError(f"'penalty must be callable. Found: {penalty}'")
 
             penalty_matrix = penalty(self.n_coefs)  # penalties dont need coef
-            penalty_matrices.append(np.multiply(penalty_matrix, np.sqrt(lam)))
+
+            # Multiply by penalty, we want the square root of the quaddratic form
+            # lam coef^T P^T P coef
+            # so we create sqrt(lam) P here
+            penalty_matrix = penalty_matrix * np.sqrt(lam)
+            # penalty_matrix = penalty_matrix + np.eye(self.n_coefs) * 1e-1
+
+            penalty_matrices.append(penalty_matrix)
 
         # Sum to a single (n_coefs, n_coefs) matrix
         penalty_matrix = np.sum(penalty_matrices, axis=0)
@@ -360,7 +370,7 @@ class Term(Core, metaclass=ABCMeta):
         assert penalty_matrix.shape == (self.n_coefs, self.n_coefs)
         return penalty_matrix
 
-    def build_constraints(self, coef, constraint_lam, constraint_l2):
+    def build_constraints(self, coef, constraint_lam):
         """
         builds the GAM block-diagonal constraint matrix in quadratic form
         out of constraint matrices specified for each feature.
@@ -376,12 +386,6 @@ class Term(Core, metaclass=ABCMeta):
 
             typically this is a very large number.
 
-        constraint_l2 : float,
-            loading to improve the numerical conditioning of the constraint
-            matrix.
-
-            typically this is a very small number.
-
         Returns
         -------
         C : sparse CSC matrix containing the model constraints in quadratic form
@@ -389,7 +393,7 @@ class Term(Core, metaclass=ABCMeta):
         if self.isintercept:
             return np.array([[0.0]])
 
-        Cs = []
+        constraint_matrices = []
         for constraint in self.constraints:
 
             if constraint is None:
@@ -400,17 +404,14 @@ class Term(Core, metaclass=ABCMeta):
             if not callable(constraint):
                 raise TypeError(f"'constraint must be callable. Found: {constraint}'")
 
-            C = constraint(self.n_coefs, coef) * constraint_lam
-            Cs.append(C)
+            C = constraint(coef) * np.sqrt(constraint_lam)
+            constraint_matrices.append(C)
 
-        Cs = np.sum(Cs)
-
-        # improve condition
-        # TODO: np.array has no nnz member
-        if Cs.nnz > 0:
-            Cs += sp.sparse.diags(constraint_l2 * np.ones(Cs.shape[0]))
-
-        return Cs
+        # Sum to a single (n_coefs, n_coefs) matrix
+        constraint_matrix = np.sum(constraint_matrices, axis=0)
+        assert isinstance(constraint_matrix, np.ndarray)
+        assert constraint_matrix.shape == (self.n_coefs, self.n_coefs)
+        return constraint_matrix
 
 
 class Intercept(Term):
@@ -1383,7 +1384,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
 
         return P_total
 
-    def build_constraints(self, coef, constraint_lam, constraint_l2):
+    def build_constraints(self, coef, constraint_lam):
         """
         builds the GAM block-diagonal constraint matrix in quadratic form
         out of constraint matrices specified for each feature.
@@ -1397,23 +1398,17 @@ class TensorTerm(SplineTerm, MetaTermMixin):
 
             typically this is a very large number.
 
-        constraint_l2 : float,
-            loading to improve the numerical conditioning of the constraint
-            matrix.
-
-            typically this is a very small number.
-
         Returns
         -------
         C : sparse CSC matrix containing the model constraints in quadratic form
         """
         C = sp.sparse.csc_matrix((self.n_coefs, self.n_coefs))
         for i in range(len(self._terms)):
-            C += self._build_marginal_constraints(i, coef, constraint_lam, constraint_l2)
+            C += self._build_marginal_constraints(i, coef, constraint_lam)
 
         return sp.sparse.csc_matrix(C)
 
-    def _build_marginal_constraints(self, i, coef, constraint_lam, constraint_l2):
+    def _build_marginal_constraints(self, i, coef, constraint_lam):
         """builds a constraint matrix for a marginal term in the tensor term
 
         takes a tensor's coef vector, and slices it into pieces corresponding
@@ -1432,12 +1427,6 @@ class TensorTerm(SplineTerm, MetaTermMixin):
 
             typically this is a very large number.
 
-        constraint_l2 : float,
-            loading to improve the numerical conditioning of the constraint
-            matrix.
-
-            typically this is a very small number.
-
         Returns
         -------
         C : sparse CSC matrix containing the model constraints in quadratic form
@@ -1450,7 +1439,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
             coef_slice = coef[slice_]
 
             # build the constraint matrix for that slice
-            slice_C = self._terms[i].build_constraints(coef_slice, constraint_lam, constraint_l2)
+            slice_C = self._terms[i].build_constraints(coef_slice, constraint_lam)
 
             # now enter it into the composite
             composite_C[tuple(np.meshgrid(slice_, slice_))] = slice_C.A
@@ -1754,7 +1743,7 @@ class TermList(Core, MetaTermMixin):
         """
         return sp.sparse.block_diag([term.build_penalties() for term in self._terms])
 
-    def build_constraints(self, coefs, constraint_lam, constraint_l2):
+    def build_constraints(self, coefs, constraint_lam):
         """
         builds the GAM block-diagonal constraint matrix in quadratic form
         out of constraint matrices specified for each feature.
@@ -1770,12 +1759,6 @@ class TermList(Core, MetaTermMixin):
 
             typically this is a very large number.
 
-        constraint_l2 : float,
-            loading to improve the numerical conditioning of the constraint
-            matrix.
-
-            typically this is a very small number.
-
         Returns
         -------
         C : sparse CSC matrix containing the model constraints in quadratic form
@@ -1783,8 +1766,11 @@ class TermList(Core, MetaTermMixin):
         C = []
         for i, term in enumerate(self._terms):
             idxs = self.get_coef_indices(i=i)
-            C.append(term.build_constraints(coefs[idxs], constraint_lam, constraint_l2))
-        return sp.sparse.block_diag(C)
+            C.append(term.build_constraints(coefs[idxs], constraint_lam))
+
+        block_matrix = sp.sparse.block_diag(C)
+        assert block_matrix.shape[0] == block_matrix.shape[1]
+        return block_matrix
 
 
 # Minimal representations
