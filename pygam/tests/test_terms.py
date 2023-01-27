@@ -98,9 +98,6 @@ def test_tensor_args_length_must_agree_with_number_of_terms():
         te(0, 1, lam=[3])
 
     with pytest.raises(ValueError):
-        te(0, 1, lam=[3])
-
-    with pytest.raises(ValueError):
         te(0, 1, lam=[3, 3, 3])
 
 
@@ -360,11 +357,11 @@ class TestRegressions:
         term = SplineTerm(feature=0, penalties=["auto", "none"])
 
         # penalties should be equivalent
-        assert (term.build_penalties() == base_term.build_penalties()).A.all()
+        assert (term.build_penalties() == base_term.build_penalties()).all()
 
         # multitple penalties should be additive, not multiplicative,
         # so 'none' penalty should have no effect
-        assert np.abs(term.build_penalties().A).sum() > 0
+        assert np.abs(term.build_penalties()).sum() > 0
 
     def test_compose_constraints(self, hepatitis_X_y):
         """we should be able to compose penalties
@@ -392,33 +389,4 @@ class TestRegressions:
 if __name__ == "__main__":
     import pytest
 
-    # pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules", "-k TestBasicPenalties"])
-
-    # define square wave
-    X = np.linspace(0, 1, 5000).reshape(-1, 1)
-    y = np.sin(X.ravel() * 2 * np.pi) + 1000
-
-    # when modeling the full period, we get close with a periodic basis
-    gam = LinearGAM(s(0, basis="cp", n_splines=4, spline_order=2)).fit(X, y)
-    # predictions = gam.predict(X)
-
-    import matplotlib.pyplot as plt
-
-    plt.plot(X.ravel(), y)
-    plt.plot(X.ravel(), gam.predict(X))
-    plt.show()
-
-    1 / 0
-
-    assert np.isclose(gam.predict(X), y, atol=0.01).mean() > 0.999  # Last point fails (numerics?)
-    assert np.allclose(gam.edge_knots_[0], [0, 1])
-
-    # when modeling a non-periodic function, our periodic model fails
-    gam = LinearGAM(s(0, basis="cp", n_splines=4, spline_order=0, edge_knots=[0, 0.5])).fit(X, y)
-
-    plt.plot(X.ravel(), y)
-    plt.plot(X.ravel(), gam.predict(X))
-    plt.show()
-
-    assert np.allclose(gam.predict(X), 0.5, atol=0.01)
-    assert np.allclose(gam.edge_knots_[0], [0, 0.5])
+    # pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules", "-k test_constraints_and_tensor"])

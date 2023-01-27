@@ -1442,7 +1442,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
             slice_C = self._terms[i].build_constraints(coef_slice, constraint_lam)
 
             # now enter it into the composite
-            composite_C[tuple(np.meshgrid(slice_, slice_))] = slice_C.A
+            composite_C[tuple(np.meshgrid(slice_, slice_))] = slice_C
 
         return sp.sparse.csc_matrix(composite_C)
 
