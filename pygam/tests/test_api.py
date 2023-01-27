@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from pygam import LinearGAM, s
+from pygam import LinearGAM, s, l
 
 
 class TestInvariancesToAdditionAndMultiPlication:
@@ -69,21 +69,48 @@ class TestInvariancesToAdditionAndMultiPlication:
                 # Betas in the spline term should be close to 1
                 assert np.isclose(np.sum(coefs), 0)
 
+    def test_that_linear_term_penalties_work_as_expected(self):
+
+        # Create a problem
+        generator = np.random.default_rng(23)
+        X = generator.normal(size=(10_000, 2))
+        y = 100 + X @ np.array([1, 2]) + generator.normal(size=(10_000), scale=0.01)
+
+        # Fit a GAM with linear terms and regularization
+        gam = LinearGAM(l(0, lam=10000) + l(1, lam=9)).fit(X, y)
+        penalties = np.diag(gam._P().A)
+
+        assert np.isclose(penalties[0], np.sqrt(10000)), "sqrt(lam) penalty on linear term"
+        assert np.isclose(penalties[1], np.sqrt(9)), "sqrt(lam) penalty on linear term"
+        assert np.isclose(penalties[2], 0), "No penalty on constant term"
+
+        # First estimate is pulled down by the strong regularization
+        # print((repr(gam.coef_.round(6))))
+        assert np.allclose(gam.coef_, np.array([0.502616, 1.999487, 99.990853]))
+
+        # Fit a GAM with linear terms with zero regularization
+        gam = LinearGAM(l(0, lam=0) + l(1, lam=0)).fit(X, y)
+        penalties = np.diag(gam._P().A)
+
+        assert np.allclose(penalties, 0), "No penalties on any term"
+
+        # print((repr(gam.coef_.round(6))))
+        assert np.allclose(gam.coef_, np.array([0.999936, 1.999744, 99.999993]))
+
 
 if __name__ == "__main__":
     import pytest
 
-    pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules", "-k test_intercept_equals_mean"])
+    pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules"])
 
-    X = np.linspace(0, 10, 1000).reshape(-1, 1)
-    y = np.log(1 + X.ravel())
-    gam = LinearGAM(s(0, basis="ps", n_splines=8, lam=0.1)).fit(X, y)
+    generator = np.random.default_rng(23)
+    X = generator.normal(size=(1000, 2))
+    y = 100 + X @ np.array([1, 2])
+    gam = LinearGAM(l(0, lam=100) + l(1, lam=9)).fit(X, y)
+    penalties = np.diag(gam._P().A)
+
+    assert np.isclose(penalties[0], np.sqrt(100)), "sqrt(lam) penalty on linear term"
+    assert np.isclose(penalties[1], np.sqrt(9)), "sqrt(lam) penalty on linear term"
+    assert np.isclose(penalties[2], 0), "No penalty on constant term"
 
     y_pred = gam.predict(X)
-
-    import matplotlib.pyplot as plt
-
-    plt.scatter(X, y)
-    plt.plot(X, gam.predict(X), color="black")
-
-    assert np.allclose(y, y_pred, atol=0.1)

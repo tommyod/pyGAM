@@ -810,7 +810,7 @@ class GAM(Core, MetaTermMixin):
         sign = np.sign(y - mu)
         return sign * self.distribution.deviance(y, mu, weights=weights, scaled=scaled) ** 0.5
 
-    def _estimate_model_statistics(self, B=None, U1=None):
+    def _estimate_model_statistics(self):
         """
         method to compute all of the model statistics
 
@@ -835,7 +835,6 @@ class GAM(Core, MetaTermMixin):
           output data vector of shape (n_samples,)
         modelmat : array-like, default: None
             contains the spline basis for each feature evaluated at the input
-        B : array of intermediate computations from stable optimization
         weights : array-like shape (n_samples,) or None, default: None
             containing sample weights
         U1 : cropped U matrix from SVD.

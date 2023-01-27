@@ -65,7 +65,7 @@ class BetaOptimizer:
         logger.info("--------------------------------------------------")
         logger.info("Starting algorithm 'stable_pirls_negative_weights'")
 
-        num_observations, num_splines = self.modelmat.shape
+        num_observations, num_coefficients = self.modelmat.shape
         modelmat = self.modelmat
         gam = self.gam
         Y, weights = gam.y_, gam.weights_
@@ -81,7 +81,7 @@ class BetaOptimizer:
             E = np.vstack((P, ID))
             logger.debug(f"No constraints. Creating penalty of size {E.shape} before PIRLS loop.")
 
-        min_n_m = min(num_splines, num_observations)
+        min_n_m = min(num_coefficients, num_observations)
 
         for iteration in range(1, gam.max_iter + 1):
             logger.info(f"--------------- PIRLS iteration {iteration} ---------------")
@@ -112,41 +112,51 @@ class BetaOptimizer:
             # log on-loop-start stats
             gam._on_loop_start(vars())
 
+            # We want to solve the minimization problem
+            # ||X \beta - z||^2_{W^2} + ||\beta||^2_{E^T E} =
+            # ||W X \beta - W z ||^2 + ||E \beta||^2
+            # Differentiating and setting equal to zero yields the normal eqns:
+            # (X^T W^T W X + E^T E) \beta = X^T W z
+            # The steps below follow page 274 in Wood (2nd edition)
+
+            # Compute Q R = W X
             WB = (modelmat.A.T * w).T
             Q, R = np.linalg.qr(WB)
 
             if not np.isfinite(Q).all() or not np.isfinite(R).all():
                 raise ValueError("QR decomposition produced NaN or Inf. Check X data.")
 
-            # need to recompute the number of singular values
-            min_n_m = min(num_splines, num_observations)
-            # Dinv = np.zeros((num_splines, min_n_m))
+            # Compute the SVD of R stacked over E
+            U, D, Vt = np.linalg.svd(np.vstack([R, E]))
+            logger.debug(f"SVD shapes: {U.shape} {D.shape} {Vt.shape}")
 
-            # SVD
-            logger.debug(f"SV-tacking R with shape {R.shape} over E with shape {E.shape}")
-            U, diag, Vt = np.linalg.svd(np.vstack([R, E]))
-            diag_inv = 1 / diag
-            # svd_mask = diag <= (d.max() * np.sqrt(EPS))  # mask out small singular values
+            # Only keep the sub-matrices such that R = U_1 D V^T
+            U1 = U[:min_n_m, :min_n_m]
+            logger.debug(f"Clipping U (shape: {U.shape}) to U1 (shape: {U1.shape})")
+            Vt = Vt[:min_n_m, :]
+            D_inv = (1 / D)[:min_n_m]
 
-            # Mask out if there are more splines than observations
-            U1 = U[:min_n_m, :min_n_m]  # keep only top corner of U
-            Vt = Vt[:min_n_m, :]  # keep only tom rows of V.T
-            diag_inv = diag_inv[:min_n_m]
+            # At this point WX = Q R = Q (U1 D V^T)
+            # and (X^T W^T W X + E^T E) = R^T R + E^T E = (U D V^T)^T (U D V^T) = V D^2 V^T
+            # Hence the solution is \beta = (V D^2 V^T)^{-1} (W X)^T z =
+            # (V D^{-2} V.T) (Q (U1 D V^T))^T z =
+            # V D^{-1} U1^T Q^T z
 
-            B = (diag_inv * Vt.T).dot(U1.T).dot(Q.T)
+            # Compute updated coefficients
+            inv_vt = D_inv * Vt.T
+            coef_new = np.linalg.multi_dot((inv_vt, U1.T, Q.T, pseudo_data))
 
-            coef_new = B.dot(pseudo_data).flatten()
-            diff = np.linalg.norm(gam.coef_ - coef_new) / np.linalg.norm(coef_new)
-            gam.coef_ = coef_new  # update
-            logger.debug(f"Model coefficients: {gam.coef_.round(3)}")
+            # Stopping criterion
+            relative_change = np.linalg.norm(gam.coef_ - coef_new) / np.linalg.norm(coef_new)
+            gam.coef_ = coef_new
 
             # log on-loop-end stats
             gam._on_loop_end(vars())
             logger.info(f"End of iteration {iteration}. Deviance: {gam.logs_['deviance'][-1]}")
 
             # check convergence
-            if diff < gam.tol:
-                logger.info(f"PIRLS converged {diff} < {gam.tol}")
+            if relative_change < gam.tol:
+                logger.info(f"PIRLS converged {relative_change} < {gam.tol}")
                 break
         else:
             logger.info(f"PIRLS stopped after {iteration} iterations (no convergence)")
@@ -155,27 +165,32 @@ class BetaOptimizer:
         lp = gam._linear_predictor(modelmat=modelmat)
         mu = gam.link.mu(lp, gam.distribution)
 
-        gam.statistics_["edof_per_coef"] = np.sum(U1**2, axis=1)
-        gam.statistics_["edof"] = gam.statistics_["edof_per_coef"].sum()
+        # The effective degrees of freedom is given by the trace of the hat matrix:
+        # A general source here is chapter 3.4 Shrinkage Methods in Elements, 2nd ed
+        # Below is Equation (6.3) on page 251 in Wood, 2nd ed
+        # trace( (X^T W^T W X + E^T E)^{-1} (W X)^T (W X) )
+        # trace( (W X) (X^T W^T W X + E^T E)^{-1} (W X)^T ) [by cyclic trace property]
+        # trace( Q (U1 D V^T) (V D^{-2} V^T) V D^T U1^T Q^T )
+        # trace( Q U1 D D^{-2} D^T U1^T Q^T )
+        # trace( Q U1 U1^T Q^T )
+        # trace( U1 U1^T ) = trace( U1^T U1 )               [by cyclic trace property]
+        edof_per_coef = np.sum(U1**2, axis=1)
+
+        # The covariance is given by ...
+        # TODO
+        covariance = np.linalg.multi_dot((inv_vt, U1.T, U1, inv_vt.T))
+
+        # The line below is equal to trace( U1 U1^T ) = trace( U1^T U1 )
+        gam.statistics_["edof_per_coef"] = edof_per_coef
+        gam.statistics_["edof"] = edof_per_coef.sum()
 
         if not gam.distribution._known_scale:
             gam.distribution.scale = gam.distribution.phi(y=y, mu=mu, edof=gam.statistics_["edof"], weights=weights)
 
-        # With
-        # X_1 = modelmat.A
-        # W_1 = np.diag(w**2)
-        # S_1 = (S + P + gam._C()).A
-        # we have
-        #             (equation 6.3 in wood)
-        # edof = np.diagonal(np.linalg.inv(X_1.T @ W_1 @ X_1 +S_1) @ X_1.T @ W_1 @ X_1)
-        # edof = np.diagonal(U1.dot(U1.T))
-        # edof = np.sum(U1**2, axis=1)
-        gam.statistics_["cov"] = (
-            B.dot(B.T)
-        ) * gam.distribution.scale  # parameter covariances. no need to remove a W because we are using W^2. Wood pg 184
+        gam.statistics_["cov"] = covariance * gam.distribution.scale
 
         # estimate statistics even if not converged
-        gam._estimate_model_statistics(B=B, U1=U1)
+        gam._estimate_model_statistics()
 
 
 def pirls_naive(gam):
@@ -354,13 +369,13 @@ def cholesky(A, sparse=True):
 
 if __name__ == "__main__":
     np.random.seed(4)
-    X = np.random.rand(1000, 1)
+    X = np.random.rand(100_000, 1)
     X = np.sort(X, axis=0)
     y = np.sin(X[:, 0] * 0.99 * np.pi) + np.random.randn(X.shape[0]) / 5 + 100
 
     from pygam import LinearGAM, s, l
 
-    gam = LinearGAM(s(0, n_splines=8, lam=1, constraints="monotonic_inc"), max_iter=100).fit(X, y)
+    gam = LinearGAM(s(0, n_splines=80 * 4, lam=1, constraints="monotonic_inc"), max_iter=100).fit(X, y)
 
     import matplotlib.pyplot as plt
 
