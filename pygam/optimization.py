@@ -76,10 +76,18 @@ class BetaOptimizer:
         P = gam._P().A  # Spline penalties (typically second derivative)
         ID = gam._identifiability_constraints()  # Identifiability constraints (soft sum-to-zero)
 
-        # if we dont have any constraints, then do cholesky now
+        # Since constraints are function of the coefficients, a GAM with
+        # constraints can cycle back and forth as constraints 'kick-in'
+        # and deactivate. A more gentle update approach helps:
+        step_size = 0.5
         if not gam.terms.hasconstraint:
             E = np.vstack((P, ID))
             logger.debug(f"No constraints. Creating penalty of size {E.shape} before PIRLS loop.")
+
+            # Since constraints are function of the coefficients, a GAM with
+            # constraints can cycle back and forth as constraints 'kick-in'
+            # and deactivate. A more gentle update approach helps:
+            step_size = 0.99
 
         min_n_m = min(num_coefficients, num_observations)
 
@@ -146,13 +154,24 @@ class BetaOptimizer:
             inv_vt = D_inv * Vt.T
             coef_new = np.linalg.multi_dot((inv_vt, U1.T, Q.T, pseudo_data))
 
+            # Since constraints are function of the coefficients, a GAM with
+            # constraints can cycle back and forth as constraints 'kick-in'
+            # and deactivate. A more gentle update approach helps:
+            coef_new = step_size * coef_new + (1 - step_size) * gam.coef_
+
             # Stopping criterion
             relative_change = np.linalg.norm(gam.coef_ - coef_new) / np.linalg.norm(coef_new)
+
             gam.coef_ = coef_new
 
             # log on-loop-end stats
             gam._on_loop_end(vars())
             logger.info(f"End of iteration {iteration}. Deviance: {gam.logs_['deviance'][-1]}")
+
+            # If deviance decreased, decrease the step size
+            if len(gam.logs_["deviance"]) > 2 and gam.logs_["deviance"][-1] > gam.logs_["deviance"][-2]:
+                step_size = step_size * 0.99
+                logger.info(f"Deviance increased, setting step size: {step_size:.4f}")
 
             # check convergence
             if relative_change < gam.tol:

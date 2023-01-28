@@ -7,6 +7,7 @@ from collections import defaultdict
 from copy import deepcopy
 import collections.abc
 import numbers
+import functools
 
 import numpy as np
 import scipy as sp
@@ -1198,17 +1199,17 @@ class TensorTerm(SplineTerm, MetaTermMixin):
         for k, v in kwargs.items():
             if isiterable(v):
                 if len(v) != m:
-                    raise ValueError("Expected {} to have length {}, but found {} = {}".format(k, m, k, v))
+                    msg = f"Expected {k} to have length {m}, but found {k} = {v}"
+                    raise ValueError(msg)
             else:
                 kwargs[k] = [v] * m
 
         terms = []
         for i, arg in enumerate(np.atleast_1d(args)):
-            if isinstance(arg, TensorTerm):
-                raise ValueError(
-                    "TensorTerm does not accept other TensorTerms. "
-                    "Please build a flat TensorTerm instead of a nested one."
-                )
+            if isinstance(arg, type(self)):
+                msg = "TensorTerm does not accept other TensorTerms.\n"
+                msg += "Please build a flat TensorTerm instead of a nested one."
+                raise ValueError(msg)
 
             if isinstance(arg, Term):
                 if self.verbose and kwargs:
@@ -1285,10 +1286,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
     @property
     def hasconstraint(self):
         """bool, whether the term has any constraints"""
-        constrained = False
-        for term in self._terms:
-            constrained = constrained or term.hasconstraint
-        return constrained
+        return any(term.hasconstraint for term in self._terms)
 
     @property
     def n_coefs(self):
@@ -1314,9 +1312,8 @@ class TensorTerm(SplineTerm, MetaTermMixin):
             term.compile(X, verbose=False)
 
         if self.by is not None and self.by >= X.shape[1]:
-            raise ValueError(
-                "by variable requires feature {}, " "but X has only {} dimensions".format(self.by, X.shape[1])
-            )
+            msg = f"by variable requires feature {self.by}, but X has only {X.shape[1]} dimensions"
+            raise ValueError(msg)
         return self
 
     def build_columns(self, X, verbose=False):
@@ -1334,10 +1331,8 @@ class TensorTerm(SplineTerm, MetaTermMixin):
         -------
         scipy sparse array with n rows
         """
-        splines = self._terms[0].build_columns(X, verbose=verbose)
-        for term in self._terms[1:]:
-            marginal_splines = term.build_columns(X, verbose=verbose)
-            splines = tensor_product(splines, marginal_splines)
+        columns_list = [term.build_columns(X, verbose=verbose) for term in self._terms]
+        splines = functools.reduce(tensor_product, columns_list)
 
         if self.by is not None:
             splines *= X[:, self.by][:, np.newaxis]
@@ -1363,7 +1358,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
         P : sparse CSC matrix containing the model penalties in quadratic form
         """
         P = sp.sparse.csc_matrix((self.n_coefs, self.n_coefs))
-        for i in range(len(self._terms)):
+        for i, _ in enumerate(self._terms):
             P += self._build_marginal_penalties(i)
 
         return sp.sparse.csc_matrix(P)
@@ -1403,7 +1398,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
         C : sparse CSC matrix containing the model constraints in quadratic form
         """
         C = sp.sparse.csc_matrix((self.n_coefs, self.n_coefs))
-        for i in range(len(self._terms)):
+        for i, _ in enumerate(self._terms):
             C += self._build_marginal_constraints(i, coef, constraint_lam)
 
         return sp.sparse.csc_matrix(C)
@@ -1461,18 +1456,36 @@ class TensorTerm(SplineTerm, MetaTermMixin):
         ------
         np.ndarray of ints
         """
+        # Example: dims = [2, 3, 4]
         dims = [term_.n_coefs for term_ in self]
 
         # make all linear indices
+        # Example: array([0, 1, 2, ... , 22, 23])
         idxs = np.arange(np.prod(dims))
 
         # reshape indices to a Nd matrix
+        # Example has shape (2, 3, 4) and entries
+        # array([[[ 0,  1,  2,  3],
+        #         [ 4,  5,  6,  7],
+        #         [ 8,  9, 10, 11]],
+
+        #        [[12, 13, 14, 15],
+        #         [16, 17, 18, 19],
+        #         [20, 21, 22, 23]]])
         idxs = idxs.reshape(dims)
 
         # reshape to a 2d matrix, where we can loop over rows
-        idxs = np.moveaxis(idxs, i, 0).reshape(idxs.shape[i], int(idxs.size / idxs.shape[i]))
+        # Example (with i=0)
+        # array([[ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11],
+        #        [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]])
+        idxs = np.moveaxis(idxs, i, 0).reshape(idxs.shape[i], idxs.size // idxs.shape[i])
 
         # loop over rows
+        # Example yields:
+        # -> [ 0 12]
+        # -> [ 1 13]
+        # ...
+        # -> [11 23]
         for slice_ in idxs.T:
             yield slice_
 
@@ -1880,3 +1893,12 @@ if __name__ == "__main__":
     CD = FDMatrix.centered_diff(10, periodic=False)
     second_order_CD = CD @ CD
     print(second_order_CD @ np.arange(10) ** 2)
+
+    print("------------------------------------------------------------------")
+    tensor = TensorTerm(SplineTerm(0), SplineTerm(1), n_splines=[3, 3], lam=[1, 1])
+
+    tensor = TensorTerm(SplineTerm(0, n_splines=3, lam=1), SplineTerm(1, n_splines=3, lam=1), verbose=True)
+
+    # te(0, 1, n_splines=[3, 3])
+
+    print(tensor)

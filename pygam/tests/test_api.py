@@ -97,20 +97,79 @@ class TestInvariancesToAdditionAndMultiPlication:
         # print((repr(gam.coef_.round(6))))
         assert np.allclose(gam.coef_, np.array([0.999936, 1.999744, 99.999993]))
 
+    def test_that_spline_reduces_to_linear_function_with_strong_penalty(self):
+
+        X = np.linspace(0, 1, 10000, endpoint=False).reshape(-1, 1) + 0
+        y = 5 * X.ravel() + np.sin(X.ravel() * np.pi)
+
+        # Fit a spline GAM with strong penalty, and a linear GAM with no penalty
+        gam_spline_term = LinearGAM(
+            s(
+                0,
+                lam=10000000,
+                n_splines=10,
+                edge_knots=(0, 1),
+            )
+        ).fit(X, y)
+        gam_linear_term = LinearGAM(l(0, lam=0)).fit(X, y)
+
+        # Equal up to visual distinction
+        assert np.allclose(gam_spline_term.predict(X), gam_linear_term.predict(X), rtol=1e-2)
+
 
 if __name__ == "__main__":
     import pytest
 
-    pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules"])
+    from pygam import GAM
+
+    # pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules"])
 
     generator = np.random.default_rng(23)
-    X = generator.normal(size=(1000, 2))
-    y = 100 + X @ np.array([1, 2])
-    gam = LinearGAM(l(0, lam=100) + l(1, lam=9)).fit(X, y)
-    penalties = np.diag(gam._P().A)
+    X = generator.normal(size=(10_000, 2))
 
-    assert np.isclose(penalties[0], np.sqrt(100)), "sqrt(lam) penalty on linear term"
-    assert np.isclose(penalties[1], np.sqrt(9)), "sqrt(lam) penalty on linear term"
-    assert np.isclose(penalties[2], 0), "No penalty on constant term"
+    idx_sort = np.argsort(X[:, 0])
+    X = X[idx_sort, :]
 
-    y_pred = gam.predict(X)
+    # X = np.sort(X, axis=0)
+    y = 10 + np.sin(X[:, 0]) + 1 * np.cos(X[:, 1]) + generator.normal(size=(10_000), scale=0.1)
+
+    gam = GAM(s(0, lam=1) + s(1, lam=1), link="identity").fit(X, y)
+
+    import matplotlib.pyplot as plt
+
+    plt.scatter(X[:, 0], y)
+    plt.plot(X[:, 0], gam.predict(X), color="black")
+    plt.grid(True)
+    plt.show()
+
+    idx_sort = np.argsort(X[:, 1])
+    X = X[idx_sort, :]
+    plt.scatter(X[:, 1], y)
+    plt.plot(X[:, 1], gam.predict(X), color="black")
+    plt.grid(True)
+    plt.show()
+
+    y_preds = gam.predict(X)
+    # assert len(np.unique(np.diff(y_preds, n=spline_order)))
+
+    # assert np.allclose(gam_spline_term.predict(X), gam_linear_term.predict(X), rtol=1e-2)
+
+    from pygam import LinearGAM
+    from pygam.datasets import mcycle
+
+    X, y = mcycle()
+
+    gam = LinearGAM(s(0, lam=0.1)).fit(X, y)
+
+    XX = gam.generate_X_grid(term=0)
+
+    m = X.min()
+    M = X.max()
+    XX = np.linspace(m - 10, M + 10, 500).reshape(-1, 1)
+    Xl = np.linspace(m - 10, m, 50)
+    Xr = np.linspace(M, M + 10, 50)
+
+    plt.figure()
+
+    plt.scatter(X, y)
+    plt.plot(XX, gam.predict(XX), "k")

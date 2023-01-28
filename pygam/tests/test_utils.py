@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from pygam import *
-from pygam.utils import check_X, check_y, sig_code
+from pygam.utils import check_X, check_y, sig_code, tensor_product
 
 # TODO check dtypes works as expected
 # TODO checkX, checky, check XY expand as needed, call out bad domain
@@ -226,3 +226,11 @@ def test_no_SKSPIMPORT(mcycle_X_y):
 
             X, y = mcycle_X_y
             assert LinearGAM().fit(X, y)._is_fitted
+
+
+if __name__ == "__main__":
+    A = np.eye(3)
+    B = np.arange(9).reshape(3, 3)
+    T = tensor_product(A, B)
+
+    print(T)

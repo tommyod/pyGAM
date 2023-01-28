@@ -41,6 +41,9 @@ class FDMatrix:
                [ 0.,  0., -1.,  1.],
                [ 0.,  0.,  0.,  0.]])
         """
+        if n == 1:
+            return np.array([[0]])
+
         if periodic:
             return sp.linalg.circulant([-1] + [0] * (n - 2) + [1]).astype(float)
         else:
@@ -77,6 +80,9 @@ class FDMatrix:
                [ 0., -1.,  1.,  0.],
                [ 0.,  0., -1.,  1.]])
         """
+        if n == 1:
+            return np.array([[0]])
+
         if periodic:
             return sp.linalg.circulant([1] + [0] * (n - 2) + [-1]).T.astype(float)
         else:
@@ -360,42 +366,6 @@ def monotonicity_(coef, increasing=True):
     return D.dot(D.T).tocsc()
 
 
-def convexity_(n, coef, convex=True):
-    """
-    Builds a penalty matrix for P-Splines with continuous features.
-    Penalizes violation of convexity in the feature function.
-
-    Parameters
-    ----------
-    n : int
-        number of splines
-    coef : array-like
-        coefficients of the feature function
-    convex : bool, default: True
-        whether to enforce convex, or concave functions
-    Returns
-    -------
-    penalty matrix : sparse csc matrix of shape (n,n)
-    """
-    if n != len(coef.ravel()):
-        raise ValueError(
-            "dimension mismatch: expected n equals len(coef), "
-            "but found n = {}, coef.shape = {}.".format(n, coef.shape)
-        )
-
-    if n == 1:
-        # no convex penalty for constant functions
-        return sp.sparse.csc_matrix(0.0)
-
-    if convex:
-        mask = sp.sparse.diags((np.diff(coef.ravel(), n=2) < 0).astype(float))
-    else:
-        mask = sp.sparse.diags((np.diff(coef.ravel(), n=2) > 0).astype(float))
-
-    derivative = 2
-    D = sparse_diff(sp.sparse.identity(n).tocsc(), n=derivative) * mask
-    # print(f"Shape of D: {D.shape}")
-    return D.A.T
 
 
 def convex(coef):
@@ -552,42 +522,3 @@ if __name__ == "__main__":
     import pytest
 
     # pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules"])
-
-    if True:
-
-        np.random.seed(1)
-        a = np.random.randn(20)
-        a = np.array([1, 5, 3, 2])
-
-        constraint = convex
-
-        import matplotlib.pyplot as plt
-
-        # plt.title(error_vec.dot(error_vec))
-        plt.plot(a)
-        plt.plot(constraint(a) @ a)
-        plt.show()
-
-        error_vec = constraint(a) @ a
-        while error_vec.dot(error_vec) > 1e-18:
-
-            print(a)
-            print(error_vec)
-            print()
-
-            a = a - 1.1 * error_vec
-
-            import time
-
-            time.sleep(0.01)
-
-            import matplotlib.pyplot as plt
-
-            plt.title(error_vec.dot(error_vec))
-            plt.plot(a)
-            plt.plot(constraint(a) @ a)
-            plt.show()
-
-            error_vec = constraint(a) @ a
-
-        assert np.allclose(error_vec, 0)

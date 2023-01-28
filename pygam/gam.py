@@ -500,6 +500,9 @@ class GAM(Core, MetaTermMixin):
         y : np.array of shape (n_samples,)
             containing predicted values under the model
         """
+        if not self._is_fitted:
+            raise AttributeError("GAM has not been fitted. Call fit first.")
+        X = check_array(X, force_all_finite=True, input_name="X", ensure_2d=True, estimator=self)
         return self.predict_mu(X)
 
     def _modelmat(self, X, term=-1):
@@ -624,7 +627,7 @@ class GAM(Core, MetaTermMixin):
         Notes
         -----
             This method implements the suggestions in
-            Wood, section 2.2.2 Geometry and IRLS convergence, pg 80
+            Wood (2nd ed), section 3.2.2 Geometry and IRLS convergence, pg 124
         """
         logger.info("Calling `_initial_estimate`")
 
@@ -642,11 +645,13 @@ class GAM(Core, MetaTermMixin):
         y_ = make_2d(y_)
         assert np.isfinite(y_).all(), "transformed response values should be well-behaved."
 
-        # solve the linear problem
-        return np.linalg.solve(load_diagonal(modelmat.T.dot(modelmat).A), modelmat.T.dot(y_))
-
-        # not sure if this is faster...
-        # return np.linalg.pinv(modelmat.T.dot(modelmat)).dot(modelmat.T.dot(y_))
+        # Solve ||X \beta - y||^2_W, where W is a diagonal loading matrix
+        # This is the Ridge problem, and sklearn solves it like this:
+        # https://github.com/scikit-learn/scikit-learn/blob/4db04923a754b6a2defa1b172f55d492b85d165e/sklearn/linear_model/_ridge.py#L204
+        lhs = load_diagonal(modelmat.T.dot(modelmat).A)
+        rhs = modelmat.T.dot(y_)
+        ans = sp.linalg.solve(lhs, rhs, assume_a="sym")
+        return ans.ravel()
 
     def _on_loop_start(self, variables):
         """
@@ -1234,7 +1239,7 @@ class GAM(Core, MetaTermMixin):
         Returns
         -------
         if meshgrid is False:
-            np.array of shape (n, n_features)
+            np.array of shape (m, n_features)
             where m is the number of
             (sub)terms in the requested (tensor)term.
         else:
@@ -1249,6 +1254,44 @@ class GAM(Core, MetaTermMixin):
         ValueError :
             If the term requested is an intercept
             since it does not make sense to process the intercept term.
+
+        Examples
+        --------
+        >>> x = [np.linspace(0, i, num=2) for i in range(1, 4)]
+        >>> X = np.vstack(x).T
+        >>> y = X @ np.array([1, 2, 3])
+        >>> gam = LinearGAM(s(0) + te(1, 2)).fit(X, y)
+        >>> gam.generate_X_grid(0, n=10, meshgrid=False)
+        array([[0.        , 0.        , 0.        ],
+               [0.11111111, 0.        , 0.        ],
+               [0.22222222, 0.        , 0.        ],
+               [0.33333333, 0.        , 0.        ],
+               [0.44444444, 0.        , 0.        ],
+               [0.55555556, 0.        , 0.        ],
+               [0.66666667, 0.        , 0.        ],
+               [0.77777778, 0.        , 0.        ],
+               [0.88888889, 0.        , 0.        ],
+               [1.        , 0.        , 0.        ]])
+        >>> gam.generate_X_grid(0, n=10, meshgrid=True)
+        (array([0.        , 0.11111111, 0.22222222, 0.33333333, 0.44444444,
+               0.55555556, 0.66666667, 0.77777778, 0.88888889, 1.        ]),)
+        >>> gam.generate_X_grid(1, n=3, meshgrid=False)
+        array([[0. , 0. , 0. ],
+               [0. , 0. , 1.5],
+               [0. , 0. , 3. ],
+               [0. , 1. , 0. ],
+               [0. , 1. , 1.5],
+               [0. , 1. , 3. ],
+               [0. , 2. , 0. ],
+               [0. , 2. , 1.5],
+               [0. , 2. , 3. ]])
+        >>> gam.generate_X_grid(1, n=3, meshgrid=True)
+        (array([[0., 0., 0.],
+               [1., 1., 1.],
+               [2., 2., 2.]]), array([[0. , 1.5, 3. ],
+               [0. , 1.5, 3. ],
+               [0. , 1.5, 3. ]]))
+
         """
         if not self._is_fitted:
             raise AttributeError("GAM has not been fitted. Call fit first.")
@@ -1259,10 +1302,7 @@ class GAM(Core, MetaTermMixin):
 
         # process each subterm in a TensorTerm
         if self.terms[term].istensor:
-            Xs = []
-            for term_ in self.terms[term]:
-                Xs.append(np.linspace(term_.edge_knots_[0], term_.edge_knots_[1], num=n))
-
+            Xs = [np.linspace(*term_.edge_knots_, num=n) for term_ in self.terms[term]]
             Xs = np.meshgrid(*Xs, indexing="ij")
             if meshgrid:
                 return tuple(Xs)
@@ -1271,7 +1311,7 @@ class GAM(Core, MetaTermMixin):
 
         # all other Terms
         elif hasattr(self.terms[term], "edge_knots_"):
-            x = np.linspace(self.terms[term].edge_knots_[0], self.terms[term].edge_knots_[1], num=n)
+            x = np.linspace(*self.terms[term].edge_knots_, num=n)
 
             if meshgrid:
                 return (x,)
@@ -1286,7 +1326,7 @@ class GAM(Core, MetaTermMixin):
 
         # dont know what to do here
         else:
-            raise TypeError("Unexpected term type: {}".format(self.terms[term]))
+            raise TypeError(f"Unexpected term type: {self.terms[term]}")
 
     def partial_dependence(self, term, X=None, width=None, quantiles=None, meshgrid=False):
         """
@@ -1348,22 +1388,22 @@ class GAM(Core, MetaTermMixin):
             raise AttributeError("GAM has not been fitted. Call fit first.")
 
         if not isinstance(term, int):
-            raise ValueError("term must be an integer, but found term: {}".format(term))
+            raise ValueError(f"term must be an integer, but found term: {term}.")
 
         # ensure term exists
         if (term >= len(self.terms)) or (term < -1):
-            raise ValueError("Term {} out of range for model with {} terms".format(term, len(self.terms)))
+            raise ValueError(f"Term {term} out of range for model with {len(self.terms)} terms.")
 
         # cant do Intercept
         if self.terms[term].isintercept:
-            raise ValueError("cannot create grid for intercept term")
+            raise ValueError("Cannot create grid for intercept term.")
 
         if X is None:
             X = self.generate_X_grid(term=term, meshgrid=meshgrid)
 
         if meshgrid:
             if not isinstance(X, tuple):
-                raise ValueError("X must be a tuple of grids if `meshgrid=True`, " "but found X: {}".format(X))
+                raise ValueError(f"X must be a tuple of grids if `meshgrid=True`, but found X: {X}")
             shape = X[0].shape
 
             X = self._flatten_mesh(X, term=term)
@@ -1389,10 +1429,13 @@ class GAM(Core, MetaTermMixin):
 
         if meshgrid:
             for i, array in enumerate(out):
+                print(i, array.shape)
                 # add extra dimensions arising from multiple confidence intervals
                 if array.ndim > 1:
                     depth = array.shape[-1]
                     shape += (depth,)
+
+                print(f"reshape from {array.shape} to {shape}")
                 out[i] = np.reshape(array, shape)
 
         if compute_quantiles:
@@ -2186,6 +2229,8 @@ class LinearGAM(GAM):
         if not self._is_fitted:
             raise AttributeError("GAM has not been fitted. Call fit first.")
 
+        X = check_array(X, force_all_finite=True, input_name="X", ensure_2d=True, estimator=self)
+
         X = check_X(
             X,
             n_feats=self.statistics_["m_features"],
@@ -2350,14 +2395,16 @@ class LogisticGAM(GAM):
 
         Parameters
         ---------
-        X : array-like of shape (n_samples, m_features), optional (default=None)
-            containing the input dataset
+        X : array-like of shape (n_samples, m_features)
 
         Returns
         -------
         y : np.array of shape (n_samples,)
             containing binary targets under the model
         """
+        if not self._is_fitted:
+            raise AttributeError("GAM has not been fitted. Call fit first.")
+        X = check_array(X, force_all_finite=True, input_name="X", ensure_2d=True, estimator=self)
         return self.predict_mu(X) > 0.5
 
     def predict_proba(self, X):
@@ -2374,6 +2421,9 @@ class LogisticGAM(GAM):
         y : np.array of shape (n_samples,)
             containing expected values under the model
         """
+        if not self._is_fitted:
+            raise AttributeError("GAM has not been fitted. Call fit first.")
+        X = check_array(X, force_all_finite=True, input_name="X", ensure_2d=True, estimator=self)
         return self.predict_mu(X)
 
 
@@ -2631,6 +2681,8 @@ class PoissonGAM(GAM):
         if not self._is_fitted:
             raise AttributeError("GAM has not been fitted. Call fit first.")
 
+        X = check_array(X, force_all_finite=True, input_name="X", ensure_2d=True, estimator=self)
+
         X = check_X(
             X,
             n_feats=self.statistics_["m_features"],
@@ -2657,7 +2709,8 @@ class PoissonGAM(GAM):
         gridsearch method is lazy and will not remove useless combinations
         from the search space, eg.
 
-        >>> n_splines=np.arange(5,10), fit_splines=[True, False]
+        >>> n_splines=np.arange(5,10)
+        >>> fit_splines=[True, False]
 
         will result in 10 loops, of which 5 are equivalent because
         even though fit_splines==False
@@ -3201,6 +3254,9 @@ class ExpectileGAM(GAM):
 
 
 if __name__ == "__main__":
+    import pytest
+
+    pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules", "-k generate_X_grid"])
 
     x = np.linspace(0, 1, num=2**10)
     y = np.sin(x * 2.5) + np.random.randn(len(x)) / 5
