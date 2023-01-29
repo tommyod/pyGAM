@@ -5,10 +5,10 @@ from copy import deepcopy
 import numpy as np
 import pytest
 
-from pygam import *
+from pygam import LinearGAM, PoissonGAM, f, l, s, te
+from pygam.penalties import FDMatrix
 from pygam.terms import FactorTerm, Intercept, LinearTerm, SplineTerm, TensorTerm, Term, TermList
 from pygam.utils import flatten
-from pygam.penalties import FDMatrix
 
 
 @pytest.fixture
@@ -285,13 +285,10 @@ def test_tensor_composite_constraints_equal_penalties():
     """check that the composite constraint matrix for a tensor term
     is equivalent to a penalty matrix under the correct conditions
     """
-    from pygam.penalties import derivative
 
     def der1(*args, **kwargs):
         kwargs.update({"order": 1})
         return FDMatrix.derivative(*args, **kwargs, periodic=False)
-        print(args, kwargs)
-        return derivative(*args, **kwargs)
 
     # create a 3D tensor where the penalty should be equal to the constraint
     term = te(0, 1, 2, n_splines=[4, 5, 6], penalties=der1, lam=1, constraints="monotonic_inc")

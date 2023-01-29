@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pygam import *
+from pygam import GAM, GammaGAM, InvGaussGAM, LinearGAM, LogisticGAM, PoissonGAM
 
 
 def test_gridsearch_returns_scores(mcycle_X_y):
@@ -116,12 +116,12 @@ def test_wrong_grid_shape(cake_X_y):
     lams = np.random.rand(50, X.shape[1] + 1)
 
     with pytest.raises(ValueError):
-        scores = LinearGAM().gridsearch(X, y, lam=lams, return_scores=True)
+        LinearGAM().gridsearch(X, y, lam=lams, return_scores=True)
 
     lams = lams.T.tolist()
     assert len(lams) == X.shape[1] + 1
     with pytest.raises(ValueError):
-        scores = LinearGAM().gridsearch(X, y, lam=lams, return_scores=True)
+        LinearGAM().gridsearch(X, y, lam=lams, return_scores=True)
 
 
 def test_GCV_objective_is_for_unknown_scale(mcycle_X_y, default_X_y, coal_X_y, trees_X_y):

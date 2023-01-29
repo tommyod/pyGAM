@@ -22,17 +22,8 @@ from pygam.distributions import (
     PoissonDist,
 )
 from pygam.links import LINKS, IdentityLink, InverseLink, InvSquaredLink, Link, LogitLink, LogLink
-from pygam.optimization import cholesky, BetaOptimizer
-from pygam.penalties import (
-    CONSTRAINTS,
-    PENALTIES,
-    concave,
-    convex,
-    derivative,
-    l2,
-    monotonic_dec,
-    monotonic_inc,
-)
+from pygam.optimization import BetaOptimizer
+from pygam.penalties import CONSTRAINTS, PENALTIES, concave, convex, derivative, l2, monotonic_dec, monotonic_inc
 from pygam.terms import (
     FactorTerm,
     Intercept,
@@ -105,7 +96,6 @@ __all__ = [
     "space_row",
     "sig_code",
     "b_spline_basis",
-    "cholesky",
     "check_param",
     "isiterable",
     "NotPositiveDefiniteError",

@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 
-import numpy as np
-import pytest
 import itertools
 
+import numpy as np
+import pytest
+
 from pygam import LinearGAM, s
-from pygam.penalties import concave, convex, derivative, l2, monotonic_dec, monotonic_inc, no_penalty, no_constraint
+from pygam.penalties import concave, convex, derivative, l2, monotonic_dec, monotonic_inc, no_constraint, no_penalty
 
 
 class TestFiniteDifferenceMatrices:
@@ -149,14 +150,12 @@ if __name__ == "__main__":
 
     if True:
         from pygam.datasets import hepatitis
-        from pygam import GAM
 
         X, y = hepatitis(True)
 
         for max_iter in range(2, 99):
 
             # This dataset only has one feature
-            from pygam.datasets import hepatitis
 
             X, y = hepatitis(True)
 

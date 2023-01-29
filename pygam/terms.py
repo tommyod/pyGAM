@@ -1,23 +1,21 @@
 """
 Link functions
 """
+import collections.abc
+import functools
+import numbers
 import warnings
 from abc import ABCMeta, abstractmethod, abstractproperty
 from collections import defaultdict
 from copy import deepcopy
-import collections.abc
-import numbers
-import functools
 
 import numpy as np
 import scipy as sp
 
 from pygam.core import Core, nice_repr
+from pygam.log import setup_custom_logger
 from pygam.penalties import CONSTRAINTS, PENALTIES
 from pygam.utils import b_spline_basis, check_param, flatten, gen_edge_knots, isiterable, tensor_product
-
-
-from pygam.log import setup_custom_logger
 
 logger = setup_custom_logger(__name__)
 

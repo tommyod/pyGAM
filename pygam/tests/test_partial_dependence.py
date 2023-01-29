@@ -1,12 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import sys
-
-import numpy as np
 import pytest
-import scipy as sp
 
-from pygam import *
+from pygam import LinearGAM, PoissonGAM, s, te
+from pygam.datasets import chicago
 
 
 class TestPartialDepencence:
@@ -76,9 +73,6 @@ class TestPartialDepencence:
         - confi is meshes with the dimension of the term, and number of confis
         """
 
-        from pygam.datasets import chicago
-        from pygam import PoissonGAM
-
         X, y = chicago(True)
         chicago_gam = PoissonGAM(terms=s(0, n_splines=200) + te(3, 1) + s(2)).fit(X, y)
 
@@ -138,10 +132,10 @@ class TestPartialDepencence:
 
         gam_intercept = LinearGAM(fit_intercept=True).fit(X, y)
         with pytest.raises(ValueError):
-            pdeps = gam_intercept.partial_dependence(term=-1)
+            gam_intercept.partial_dependence(term=-1)
 
         gam_no_intercept = LinearGAM(fit_intercept=False).fit(X, y)
-        pdeps = gam_no_intercept.partial_dependence(term=-1)
+        gam_no_intercept.partial_dependence(term=-1)
 
     def test_no_X_needed_for_partial_dependence(self, mcycle_gam):
         """
@@ -152,15 +146,13 @@ class TestPartialDepencence:
 
 
 if __name__ == "__main__":
-    import pytest
 
-    if True:
-        pytest.main(
-            args=[
-                __file__,
-                "-v",
-                "--capture=sys",
-                "--doctest-modules",
-                "-k test_partial_dependence_gives_correct_shape_with_meshgrid",
-            ]
-        )
+    pytest.main(
+        args=[
+            __file__,
+            "-v",
+            "--capture=sys",
+            "--doctest-modules",
+            # "-k test_partial_dependence_gives_correct_shape_with_meshgrid",
+        ]
+    )

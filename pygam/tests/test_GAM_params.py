@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from pygam import *
+from pygam import LinearGAM, LogisticGAM, intercept, l, s
 
 
 def test_lam_non_neg_array_like(cake_X_y):
@@ -13,12 +13,12 @@ def test_lam_non_neg_array_like(cake_X_y):
     X, y = cake_X_y
 
     try:
-        gam = LinearGAM(lam=-1).fit(X, y)
+        LinearGAM(lam=-1).fit(X, y)
     except ValueError:
         assert True
 
     try:
-        gam = LinearGAM(lam=["hi"]).fit(X, y)
+        LinearGAM(lam=["hi"]).fit(X, y)
     except ValueError:
         assert True
 
@@ -30,11 +30,11 @@ def test_penalties_must_be_or_contain_callable_or_auto(mcycle_X_y):
     X, y = mcycle_X_y
 
     with pytest.raises(ValueError):
-        gam = LinearGAM(terms=s(0, penalties="continuous"))
+        LinearGAM(terms=s(0, penalties="continuous"))
 
     # now do iterable
     with pytest.raises(ValueError):
-        gam = LinearGAM(s(0, penalties=["continuous"]))
+        LinearGAM(s(0, penalties=["continuous"]))
 
 
 def test_intercept(mcycle_X_y):

@@ -2,11 +2,13 @@
 Penalty matrix generators
 """
 
-import warnings
 import functools
+import warnings
 
 import numpy as np
 import scipy as sp
+
+# https://github.com/scipy/scipy/blob/dde50595862a4f9cede24b5d1c86935c30f1f88a/scipy/_lib/_finite_differences.py#L69
 
 
 class FDMatrix:
@@ -331,43 +333,6 @@ def monotonic_dec(coef):
     return -D
 
 
-def monotonicity_(coef, increasing=True):
-    """
-    Builds a penalty matrix for P-Splines with continuous features.
-    Penalizes violation of monotonicity in the feature function.
-
-    Parameters
-    ----------
-    coef : array-like
-        coefficients of the feature function
-    increasing : bool, default: True
-        whether to enforce monotic increasing, or decreasing functions
-    Returns
-    -------
-    penalty matrix : sparse csc matrix of shape (n,n)
-    """
-    n = len(coef)
-
-    if n == 1:
-        # no monotonic penalty for constant functions
-        return sp.sparse.csc_matrix(0.0)
-
-    if increasing:
-        # only penalize the case where coef_i-1 > coef_i
-        mask = sp.sparse.diags((np.diff(coef.ravel()) < 0).astype(float))
-    else:
-        # only penalize the case where coef_i-1 < coef_i
-        mask = sp.sparse.diags((np.diff(coef.ravel()) > 0).astype(float))
-
-    derivative = 1
-    D = sparse_diff(sp.sparse.identity(n).tocsc(), n=derivative) * mask
-    # print(f"Shape of D: {D.shape}")
-    return D.A.T
-    return D.dot(D.T).tocsc()
-
-
-
-
 def convex(coef):
     """
 
@@ -521,4 +486,4 @@ CONSTRAINTS = {
 if __name__ == "__main__":
     import pytest
 
-    # pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules"])
+    pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules"])

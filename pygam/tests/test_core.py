@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import numpy as np
-import pytest
-
-from pygam.core import *
+from pygam.core import Core, nice_repr
 
 
 def test_Core_class():
@@ -11,7 +8,7 @@ def test_Core_class():
     test attributes of core class
     """
     c = Core()
-    assert c._name == None
+    assert c._name is None
 
     c = Core(name="cat", line_width=70, line_offset=3)
     assert c._name == "cat"

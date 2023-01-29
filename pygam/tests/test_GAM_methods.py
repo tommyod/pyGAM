@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import scipy as sp
 
-from pygam import *
+from pygam import GAM, ExpectileGAM, LinearGAM, LogisticGAM, PoissonGAM, f, l, s
 
 
 def test_LinearGAM_prediction(mcycle_X_y, mcycle_gam):
@@ -172,6 +172,7 @@ def test_summary_returns_12_lines(mcycle_gam):
     sys.stdout = StringIO()  # Choose a file-like object to write to
     mcycle_gam.summary()
     assert len(sys.stdout.getvalue().split("\n")) == 24
+    sys.stdout = stdout
 
 
 def test_is_fitted_predict(mcycle_X_y):

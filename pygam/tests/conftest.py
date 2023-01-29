@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
 
-import numpy as np
-import pandas as pd
 import pytest
 
-from pygam import *
+from pygam import LinearGAM, PoissonGAM, f, s, te
 from pygam.datasets import (
     cake,
     chicago,

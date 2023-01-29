@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from pygam import LinearGAM, s, l
+from pygam import LinearGAM, l, s
 
 
 class TestInvariancesToAdditionAndMultiPlication:
@@ -120,56 +120,4 @@ class TestInvariancesToAdditionAndMultiPlication:
 if __name__ == "__main__":
     import pytest
 
-    from pygam import GAM
-
-    # pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules"])
-
-    generator = np.random.default_rng(23)
-    X = generator.normal(size=(10_000, 2))
-
-    idx_sort = np.argsort(X[:, 0])
-    X = X[idx_sort, :]
-
-    # X = np.sort(X, axis=0)
-    y = 10 + np.sin(X[:, 0]) + 1 * np.cos(X[:, 1]) + generator.normal(size=(10_000), scale=0.1)
-
-    gam = GAM(s(0, lam=1) + s(1, lam=1), link="identity").fit(X, y)
-
-    import matplotlib.pyplot as plt
-
-    plt.scatter(X[:, 0], y)
-    plt.plot(X[:, 0], gam.predict(X), color="black")
-    plt.grid(True)
-    plt.show()
-
-    idx_sort = np.argsort(X[:, 1])
-    X = X[idx_sort, :]
-    plt.scatter(X[:, 1], y)
-    plt.plot(X[:, 1], gam.predict(X), color="black")
-    plt.grid(True)
-    plt.show()
-
-    y_preds = gam.predict(X)
-    # assert len(np.unique(np.diff(y_preds, n=spline_order)))
-
-    # assert np.allclose(gam_spline_term.predict(X), gam_linear_term.predict(X), rtol=1e-2)
-
-    from pygam import LinearGAM
-    from pygam.datasets import mcycle
-
-    X, y = mcycle()
-
-    gam = LinearGAM(s(0, lam=0.1)).fit(X, y)
-
-    XX = gam.generate_X_grid(term=0)
-
-    m = X.min()
-    M = X.max()
-    XX = np.linspace(m - 10, M + 10, 500).reshape(-1, 1)
-    Xl = np.linspace(m - 10, m, 50)
-    Xr = np.linspace(M, M + 10, 50)
-
-    plt.figure()
-
-    plt.scatter(X, y)
-    plt.plot(XX, gam.predict(XX), "k")
+    pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules"])
