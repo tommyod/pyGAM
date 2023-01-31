@@ -461,12 +461,30 @@ def sparse_diff(array, n=1, axis=-1):
     return A[slice1] - A[slice2]
 
 
+def second_order_finite_difference(n, periodic=True):
+    if n in (1, 2):
+        return np.zeros(shape=(n, n))
+
+    # Set up tridiagonal
+    D = (np.eye(n, k=1) + np.eye(n, k=-1) - 2 * np.eye(n)).astype(float)
+    if periodic:
+        # Wrap around
+        D[0, -1] = 1
+        D[-1, 0] = 1
+        return D
+    else:
+        # Remove on first and last element
+        D[0, :2] = [0, 0]
+        D[-1, -2:] = [0, 0]
+        return D
+
+
 PENALTIES = {
     "auto": "auto",
-    "derivative": functools.partial(FDMatrix.derivative, order=2, periodic=False),
+    "derivative": functools.partial(second_order_finite_difference, periodic=False),
     "l2": l2,
     "none": no_penalty,
-    "periodic": functools.partial(FDMatrix.derivative, order=2, periodic=True),
+    "periodic": functools.partial(second_order_finite_difference, periodic=True),
 }
 
 
@@ -487,3 +505,66 @@ if __name__ == "__main__":
     import pytest
 
     pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules"])
+
+    def _central_diff_weights(Np, ndiv=1):
+        """
+        Return weights for an Np-point central derivative.
+
+        Assumes equally-spaced function points.
+
+        If weights are in the vector w, then
+        derivative is w[0] * f(x-ho*dx) + ... + w[-1] * f(x+h0*dx)
+
+        Parameters
+        ----------
+        Np : int
+            Number of points for the central derivative.
+        ndiv : int, optional
+            Number of divisions. Default is 1.
+
+        Returns
+        -------
+        w : ndarray
+            Weights for an Np-point central derivative. Its size is `Np`.
+
+        Notes
+        -----
+        Can be inaccurate for a large number of points.
+        Source: https://github.com/scipy/scipy/blob/dde50595862a4f9cede24b5d1c86935c30f1f88a/scipy/_lib/_finite_differences.py#L4
+
+        Examples
+        --------
+        We can calculate a derivative value of a function.
+
+        >>> def f(x):
+        ...     return 2 * x**2 + 3
+        >>> x = 3.0 # derivative point
+        >>> h = 0.1 # differential step
+        >>> Np = 3 # point number for central derivative
+        >>> weights = _central_diff_weights(Np) # weights for first derivative
+        >>> vals = [f(x + (i - Np/2) * h) for i in range(Np)]
+        >>> sum(w * v for (w, v) in zip(weights, vals))/h
+        11.79999999999998
+
+        This value is close to the analytical solution:
+        f'(x) = 4x, so f'(3) = 12
+
+        References
+        ----------
+        .. [1] https://en.wikipedia.org/wiki/Finite_difference
+
+        """
+        if Np < ndiv + 1:
+            raise ValueError("Number of points must be at least the derivative order + 1.")
+        if Np % 2 == 0:
+            raise ValueError("The number of points must be odd.")
+        from scipy import linalg
+
+        ho = Np >> 1
+        x = np.arange(-ho, ho + 1.0)
+        x = x[:, np.newaxis]
+        X = x**0.0
+        for k in range(1, Np):
+            X = np.hstack([X, x**k])
+        w = np.prod(np.arange(1, ndiv + 1), axis=0) * linalg.inv(X)[ndiv]
+        return w

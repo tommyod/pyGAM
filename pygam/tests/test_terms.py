@@ -368,7 +368,7 @@ class TestBasicPenalties:
         n_splines = 10
         spline = s(0, n_splines=n_splines, lam=1)
         x = np.arange(n_splines)
-        assert np.allclose(spline.build_penalties() @ x, 0)
+        assert np.allclose((spline.build_penalties() @ x)[1:-1], 0)
 
     def test_that_quadratic_betas_get_constant_penalty(self):
         from pygam import s
@@ -378,8 +378,8 @@ class TestBasicPenalties:
         x = np.arange(n_splines)
 
         # Close to 2, but with errors at the boundaries
-        ans = np.array([1.0, 1.5, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 1.5, 1.0])
-        assert np.allclose(spline.build_penalties() @ x**2, ans)
+        ans = np.array([2.0] * 8)
+        assert np.allclose((spline.build_penalties() @ x**2)[1:-1], ans)
 
 
 class TestRegressions:

@@ -119,6 +119,9 @@ __all__ = [
 EPS = np.finfo(np.float64).eps  # machine epsilon
 
 
+# TODO: Constraints
+# https://arxiv.org/pdf/1812.07696.pdf
+
 from pygam.log import setup_custom_logger
 
 logger = setup_custom_logger(__name__)
@@ -3008,6 +3011,9 @@ class ExpectileGAM(GAM):
     This is a GAM with a Normal distribution and an Identity Link,
     but minimizing the Least Asymmetrically Weighted Squares
 
+    https://freakonometrics.hypotheses.org/files/2017/05/erasmus-1.pdf
+    https://sites.google.com/site/csphilipps/expectiles
+
 
     Parameters
     ----------
@@ -3109,12 +3115,11 @@ class ExpectileGAM(GAM):
         -------
         None
         """
-        if self.expectile >= 1 or self.expectile <= 0:
-            raise ValueError("expectile must be in (0,1), but found {}".format(self.expectile))
-        self.distribution = NormalDist(scale=self.scale)
+        if not (0 < self.expectile < 1):
+            raise ValueError("expectile must be in (0,1), but found {self.expectile}")
         super()._validate_params()
 
-    def _W(self, mu, weights, y=None):
+    def _W(self, mu, weights, y):
         """
         compute the PIRLS weights for model predictions.
 
@@ -3168,8 +3173,8 @@ class ExpectileGAM(GAM):
         -------
         ratio : float on [0, 1]
         """
-        y_pred = self.predict(X)
-        return (y_pred > y).mean()
+        y_predictions = self.predict(X)
+        return (y_predictions > y).mean()
 
     def fit_quantile(self, X, y, quantile, max_iter=20, tol=0.01, weights=None):
         """fit ExpectileGAM to a desired quantile via binary search
@@ -3199,46 +3204,49 @@ class ExpectileGAM(GAM):
         """
 
         def _within_tol(a, b, tol):
-            return np.abs(a - b) <= tol
+            return abs(a - b) <= tol
 
         # validate arguments
-        if quantile <= 0 or quantile >= 1:
-            raise ValueError("quantile must be on (0, 1), but found {}".format(quantile))
+        if not (0 < quantile < 1):
+            raise ValueError(f"`quantile` must be in (0, 1), but found: {quantile}")
 
         if tol <= 0:
-            raise ValueError("tol must be float > 0 {}".format(tol))
+            raise ValueError(f"`tol` must be float > 0, but found: {tol}")
 
         if max_iter <= 0:
-            raise ValueError("max_iter must be int > 0 {}".format(max_iter))
+            raise ValueError("`max_iter` must be int > 0, but found: {max_iter}")
 
         # perform a first fit if necessary
         if not self._is_fitted:
             self.fit(X, y, weights=weights)
 
-        # do binary search
-        max_ = 1.0
-        min_ = 0.0
-        n_iter = 0
-        while n_iter < max_iter:
-            ratio = self._get_quantile_ratio(X, y)
+        # Perform binary search
+        # The goal is to choose `expectile` such that the empirical quantile
+        # matches the desired quantile. The reason for not using
+        # scipy.optimize.bisect is that bisect evalutes the endpoints first,
+        # resulting in extra unneccesary fits (we assume that 0 -> 0 and 1 -> 1)
+        min_, max_ = 0.0, 1.0
+        for iteration in range(max_iter):
+            empirical_quantile = self._get_quantile_ratio(X, y)
+            logger.debug(f"Fitting with expectile={self.expectile} gave an empirical quantile {empirical_quantile}")
+            logger.debug(f"Attempting to get close to quantile={quantile}")
 
-            if _within_tol(ratio, quantile, tol):
+            if _within_tol(empirical_quantile, quantile, tol):
                 break
 
-            if ratio < quantile:
-                min_ = self.expectile
+            if empirical_quantile < quantile:
+                min_ = self.expectile  # Move up
             else:
-                max_ = self.expectile
+                max_ = self.expectile  # Move down
 
-            expectile = (max_ + min_) / 2.0
+            expectile = (min_ + max_) / 2.0
+            logger.debug(f"Fitting with expectile={expectile}")
             self.set_params(expectile=expectile)
             self.fit(X, y, weights=weights)
 
-            n_iter += 1
-
         # print diagnostics
-        if not _within_tol(ratio, quantile, tol) and self.verbose:
-            warnings.warn("maximum iterations reached")
+        if not _within_tol(empirical_quantile, quantile, tol) and self.verbose:
+            warnings.warn(f"Maximum iterations of {max_iter} reached, but tolerance {tol} not achieved.")
 
         return self
 
@@ -3248,8 +3256,60 @@ if __name__ == "__main__":
 
     pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules", "-k generate_X_grid"])
 
-    x = np.linspace(0, 1, num=2**10)
-    y = np.sin(x * 2.5) + np.random.randn(len(x)) / 5
-    X = x.reshape(-1, 1)
+    rng = np.random.default_rng(21)
+    X = rng.normal(size=(1000, 3))
+    y = 5 + np.array([np.sin(X[:, i] * 1 * (i + 1)) for i in range(X.shape[1])]).sum(axis=0)
+    y = y + rng.normal(size=(X.shape[0]), scale=0.1)
 
-    gam = LinearGAM(s(0, n_splines=10)).fit(X, y)
+    from sklearn.model_selection import train_test_split
+    import matplotlib.pyplot as plt
+
+    for i in range(X.shape[1]):
+        X_sorted = X[np.argsort(X[:, i]), :]
+        y_sorted = y[np.argsort(X[:, i])]
+
+        plt.plot(X_sorted[:, i], y_sorted)
+        plt.show()
+
+    # =====================================================================
+
+    from scipy.optimize import minimize
+
+    methods = "Nelder-Mead,L-BFGS-B,TNC,SLSQP,Powell,trust-constr".split(",")
+
+    x0 = np.ones(X.shape[1]) * 100
+
+    for method in methods:
+        print("==============================================")
+        print(f"================= {method} =====================")
+        print("==============================================")
+
+        scores = []
+
+        def func(x):
+            global scores
+            lam = list(x)
+
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=1)
+            gam = LinearGAM(lam=lam).fit(X_train, y_train)
+            score = np.mean((y_test - gam.predict(X_test)) ** 2)
+
+            scores.append(score)
+
+            return score
+
+        minimize(
+            func,
+            x0=x0,
+            method=method,
+            bounds=[(0, np.inf) for _ in range(len(x0))],
+        )
+
+        plt.title(method)
+        plt.plot(scores)
+        plt.grid(True)
+        plt.show()
+
+        import time
+
+        time.sleep(3)
