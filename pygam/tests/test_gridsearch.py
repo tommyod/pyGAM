@@ -145,6 +145,7 @@ def test_GCV_objective_is_for_unknown_scale(mcycle_X_y, default_X_y, coal_X_y, t
 
     for gam, (X, y) in known_scale:
         try:
+            print(gam)
             list(gam().gridsearch(X, y, lam=lam, objective="GCV", return_scores=True).values())
         except ValueError:
             assert True

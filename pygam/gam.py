@@ -234,7 +234,7 @@ class GAM(Core, MetaTermMixin):
         # call super and exclude any variables
         super().__init__()
 
-        logger.info("Created GAM instance")
+        logger.info(f"Created GAM instance:\n{self}")
 
     # @property
     # def lam(self):
@@ -702,7 +702,7 @@ class GAM(Core, MetaTermMixin):
         self : object
             Returns fitted GAM object
         """
-        logger.info("Created GAM instance")
+        logger.info(f"Fitting GAM\n{self}")
 
         # validate parameters
         self._validate_params()
@@ -3117,6 +3117,7 @@ class ExpectileGAM(GAM):
         """
         if not (0 < self.expectile < 1):
             raise ValueError("expectile must be in (0,1), but found {self.expectile}")
+
         super()._validate_params()
 
     def _W(self, mu, weights, y):
