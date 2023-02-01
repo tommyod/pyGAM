@@ -1559,7 +1559,8 @@ class TermList(Core, MetaTermMixin):
                 for term_ in term._terms:
                     term_list = deduplicate(term_, term_list, uniques)
             else:
-                raise ValueError("terms must be instances of Term or TermList, " "but found term: {}".format(term))
+                msg = f"Invalid object added to TermList: {term}"
+                raise TypeError(msg)
 
         self._terms = self._terms + term_list
         self._exclude = [
@@ -1870,33 +1871,6 @@ TERMS = {
 if __name__ == "__main__":
 
     spline = s(0, n_splines=10, lam=1)
-    x = np.arange(10)
+    spline2 = s(0, n_splines=10, lam=1)
 
-    assert np.allclose(spline.build_penalties() @ x, 0)
-
-    ans = np.array([1.0, 1.5, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 1.5, 1.0])
-    assert np.allclose(spline.build_penalties() @ x**2, ans)
-    print(spline.build_penalties() @ x**2)
-
-    from pygam.penalties import FDMatrix
-
-    D = FDMatrix.forward_diff(10, periodic=False)
-    second_order_D = D @ D
-    print(second_order_D @ np.arange(10) ** 2)
-
-    D = FDMatrix.backward_diff(10, periodic=False)
-    second_order_D = D @ D
-    print(second_order_D @ np.arange(10) ** 2)
-
-    CD = FDMatrix.centered_diff(10, periodic=False)
-    second_order_CD = CD @ CD
-    print(second_order_CD @ np.arange(10) ** 2)
-
-    print("------------------------------------------------------------------")
-    tensor = TensorTerm(SplineTerm(0), SplineTerm(1), n_splines=[3, 3], lam=[1, 1])
-
-    tensor = TensorTerm(SplineTerm(0, n_splines=3, lam=1), SplineTerm(1, n_splines=3, lam=1), verbose=True)
-
-    # te(0, 1, n_splines=[3, 3])
-
-    print(tensor)
+    spline + spline2

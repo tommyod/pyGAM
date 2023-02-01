@@ -57,7 +57,7 @@ class Distribution(Core, metaclass=ABCMeta):
         if not self._known_scale:
             self._exclude += ["scale"]
 
-    def phi(self, y, mu, edof, weights):
+    def phi(self, y, mu, edof, weights=None):
         """
         GLM scale parameter.
         for Binomial and Poisson families this is unity
@@ -81,9 +81,16 @@ class Distribution(Core, metaclass=ABCMeta):
         """
         if self._known_scale:
             return self.scale
-        else:
-            # V is defined by subclasses
-            return np.sum(weights * self.V(mu) ** -1 * (y - mu) ** 2) / (len(mu) - edof)
+
+        if weights is None:
+            weights = np.ones_like(y, dtype=float)
+
+        assert len(y) == len(mu) == len(weights)
+
+        # This is the Pearson statistic at its expected value
+        # See Section 3.1.5 in Wood, 2nd ed
+        # The method V() is defined by subclasses
+        return np.sum(weights * (y - mu) ** 2 / self.V(mu)) / (len(mu) - edof)
 
     @abstractmethod
     def sample(self, mu):
@@ -147,8 +154,10 @@ class NormalDist(Distribution):
         -------
         pdf/pmf : np.array of length n
         """
+
         if weights is None:
-            weights = np.ones_like(mu)
+            weights = np.ones_like(mu, dtype=float)
+
         scale = self.scale / weights
         return sp.stats.norm.logpdf(y, loc=mu, scale=scale)
 
@@ -179,6 +188,7 @@ class NormalDist(Distribution):
         -------
         V(mu) : np.array of length n
         """
+        # See table 3.1 on page 104 in Wood, 2nd ed
         return np.ones_like(mu)
 
     @multiply_weights
@@ -195,7 +205,7 @@ class NormalDist(Distribution):
         mu : array-like of length n
             expected values
         scaled : boolean, default: True
-            whether to divide the deviance by the distribution scaled
+            whether to divide the deviance by the distribution scale
 
         Returns
         -------
@@ -321,7 +331,7 @@ class BinomialDist(Distribution):
 
     def sample(self, mu):
         """
-        Return random samples from this Normal distribution.
+        Return random samples from this Binomial distribution.
 
         Parameters
         ----------

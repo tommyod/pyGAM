@@ -151,14 +151,14 @@ class BetaOptimizer:
 
             gam.coef_ = coef_new
 
-            # log on-loop-end stats
-            gam._on_loop_end(vars())
-            logger.info(f"End of iteration {iteration}. Deviance: {gam.logs_['deviance'][-1]}")
-
             # If deviance decreased, decrease the step size
             if len(gam.logs_["deviance"]) > 2 and gam.logs_["deviance"][-1] > gam.logs_["deviance"][-2]:
                 step_size = step_size * 0.99
                 logger.info(f"Deviance increased, setting step size: {step_size:.4f}")
+
+            # log on-loop-end stats
+            gam._on_loop_end(vars())
+            logger.info(f"End of iteration {iteration}. Deviance: {gam.logs_['deviance'][-1]}")
 
             # check convergence
             if relative_change < gam.tol:

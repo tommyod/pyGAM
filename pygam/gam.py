@@ -236,20 +236,6 @@ class GAM(Core, MetaTermMixin):
 
         logger.info(f"Created GAM instance:\n{self}")
 
-    # @property
-    # def lam(self):
-    #     if self._has_terms():
-    #         return self.terms.lam
-    #     else:
-    #         return self._lam
-    #
-    # @lam.setter
-    # def lam(self, value):
-    #     if self._has_terms():
-    #         self.terms.lam = value
-    #     else:
-    #         self._lam = value
-
     def yield_terms_and_betas(self):
         assert self._is_fitted
         start_idx = 0
@@ -259,29 +245,12 @@ class GAM(Core, MetaTermMixin):
 
     @property
     def _is_fitted(self):
-        """simple way to check if the GAM has been fitted
-
-        Parameters
-        ---------
-        None
-
-        Returns
-        -------
-        bool : whether or not the model is fitted
-        """
+        """Check whether the GAM is fitted."""
         return hasattr(self, "coef_")
 
     def _validate_params(self):
-        """method to sanitize model parameters
+        """Validate input parameters."""
 
-        Parameters
-        ---------
-        None
-
-        Returns
-        -------
-        None
-        """
         # fit_intercep
         if not isinstance(self.fit_intercept, bool):
             raise ValueError("fit_intercept must be type bool, but found {}".format(self.fit_intercept.__class__))
@@ -309,7 +278,7 @@ class GAM(Core, MetaTermMixin):
         if not isiterable(self.callbacks):
             raise ValueError("Callbacks must be iterable, but found {}".format(self.callbacks))
 
-        if not all([c in CALLBACKS or isinstance(c, CallBack) for c in self.callbacks]):
+        if not all(c in CALLBACKS or isinstance(c, CallBack) for c in self.callbacks):
             raise ValueError("unsupported callback(s) {}".format(self.callbacks))
         callbacks = list(self.callbacks)
         for i, c in enumerate(self.callbacks):
@@ -318,17 +287,8 @@ class GAM(Core, MetaTermMixin):
         self.callbacks = [validate_callback(c) for c in callbacks]
 
     def _validate_data_dep_params(self, X):
-        """method to validate and prepare data-dependent parameters
+        """Validate and prepare data dependent parameters."""
 
-        Parameters
-        ---------
-        X : array-like
-            containing the input dataset
-
-        Returns
-        -------
-        None
-        """
         n_samples, m_features = X.shape
 
         # terms

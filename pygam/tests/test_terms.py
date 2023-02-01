@@ -136,7 +136,7 @@ def test_term_list_from_info():
 
 def test_term_list_only_accepts_terms_or_term_list():
     TermList()
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         TermList(None)
 
 
