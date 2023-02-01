@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import numpy as np
-import pytest
 
-from pygam.datasets import __all__ as DATASETS
 from pygam.datasets import cake, chicago, coal, default, faithful, hepatitis, mcycle, toy_interaction, trees, wage
 
 
@@ -92,3 +89,7 @@ def test_chicago():
 
 def test_toy_interaction():
     _test_dataset(toy_interaction, n_rows=50000, n_columns_X=2, n_columns_df=3)
+
+
+def test_wage():
+    _test_dataset(wage, n_rows=3000, n_columns_X=3, n_columns_df=12)

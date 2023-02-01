@@ -13,8 +13,12 @@ def setup_custom_logger(name):
     handler.setFormatter(formatter)
 
     logger = logging.getLogger(name)
+
+    # https://docs.python.org/3/library/logging.html#levels
     logger.setLevel(logging.DEBUG)
-    logger.addHandler(handler)
+
+    if not logger.hasHandlers():
+        logger.addHandler(handler)
 
     logging.info("Setup logger.")
     return logger

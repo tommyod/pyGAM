@@ -5,7 +5,8 @@ from copy import deepcopy
 import numpy as np
 import pytest
 
-from pygam import *
+from pygam import LinearGAM, PoissonGAM, f, l, s, te
+from pygam.penalties import FDMatrix
 from pygam.terms import FactorTerm, Intercept, LinearTerm, SplineTerm, TensorTerm, Term, TermList
 from pygam.utils import flatten
 
@@ -98,9 +99,6 @@ def test_tensor_args_length_must_agree_with_number_of_terms():
         te(0, 1, lam=[3])
 
     with pytest.raises(ValueError):
-        te(0, 1, lam=[3])
-
-    with pytest.raises(ValueError):
         te(0, 1, lam=[3, 3, 3])
 
 
@@ -138,7 +136,7 @@ def test_term_list_from_info():
 
 def test_term_list_only_accepts_terms_or_term_list():
     TermList()
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         TermList(None)
 
 
@@ -191,11 +189,11 @@ def test_correct_smoothing_in_tensors(toy_interaction_X_y):
     X, y = toy_interaction_X_y
 
     # increase smoothing on linear function heavily, to no detriment
-    gam = LinearGAM(te(0, 1, lam=[0.6, 10000])).fit(X, y)
+    gam = LinearGAM(te(0, 1, lam=[0.6, 100000])).fit(X, y)
     assert gam.statistics_["pseudo_r2"]["explained_deviance"] > 0.9
 
     #  smoothing the sinusoid function heavily reduces fit quality
-    gam = LinearGAM(te(0, 1, lam=[10000, 0.6])).fit(X, y)
+    gam = LinearGAM(te(0, 1, lam=[100000, 0.6])).fit(X, y)
     assert gam.statistics_["pseudo_r2"]["explained_deviance"] < 0.1
 
 
@@ -268,7 +266,7 @@ def test_cyclic_p_spline_custom_period():
 
     # when modeling a non-periodic function, our periodic model fails
     gam = LinearGAM(s(0, basis="cp", n_splines=4, spline_order=0, edge_knots=[0, 0.5])).fit(X, y)
-    assert np.allclose(gam.predict(X), 0.5, atol=0.001)
+    assert np.allclose(gam.predict(X), 0.5, atol=0.01)
     assert np.allclose(gam.edge_knots_[0], [0, 0.5])
 
 
@@ -287,11 +285,10 @@ def test_tensor_composite_constraints_equal_penalties():
     """check that the composite constraint matrix for a tensor term
     is equivalent to a penalty matrix under the correct conditions
     """
-    from pygam.penalties import derivative
 
     def der1(*args, **kwargs):
-        kwargs.update({"derivative": 1})
-        return derivative(*args, **kwargs)
+        kwargs.update({"order": 1})
+        return FDMatrix.derivative(*args, **kwargs, periodic=False)
 
     # create a 3D tensor where the penalty should be equal to the constraint
     term = te(0, 1, 2, n_splines=[4, 5, 6], penalties=der1, lam=1, constraints="monotonic_inc")
@@ -299,7 +296,7 @@ def test_tensor_composite_constraints_equal_penalties():
     # check all the dimensions
     for i in range(3):
         P = term._build_marginal_penalties(i).A
-        C = term._build_marginal_constraints(i, -np.arange(term.n_coefs), constraint_lam=1, constraint_l2=0).A
+        C = term._build_marginal_constraints(i, -np.arange(term.n_coefs), constraint_lam=1).A
 
         assert (P == C).all()
 
@@ -308,8 +305,12 @@ def test_tensor_with_constraints(hepatitis_X_y):
     """we should be able to fit a gam with not 'none' constraints on a tensor term
     and observe its effect in reducing the R2 of the fit
     """
+    # This dataset only has one feature
     X, y = hepatitis_X_y
-    X = np.c_[X, np.random.randn(len(X))]  # add a random interaction data
+
+    # Add a random interaction data
+    rng = np.random.default_rng(1)
+    X = np.c_[X, rng.normal(size=X.shape[0])]
 
     # constrain useless dimension
     gam_useless_constraint = LinearGAM(te(0, 1, constraints=["none", "monotonic_dec"], n_splines=[20, 4]))
@@ -323,7 +324,65 @@ def test_tensor_with_constraints(hepatitis_X_y):
     assert gam_constrained.statistics_["pseudo_r2"]["explained_deviance"] < 0.1
 
 
-class TestRegressions(object):
+class TestTensorTerm:
+    @pytest.mark.parametrize("splines1,splines2", [(4, 5), (3, 7), (12, 17)])
+    def test_that_creation_methods_are_equal(self, splines1, splines2):
+        tensor1 = te(0, 1, n_splines=[splines1, splines2])
+        assert tensor1.n_coefs == splines1 * splines2
+
+        tensor2 = te(s(0, n_splines=splines1), s(1, n_splines=splines2))
+        assert tensor2.n_coefs == splines1 * splines2
+
+        penalties1 = tensor1.build_penalties().A
+        penalties2 = tensor2.build_penalties().A
+        expected_shape = (splines1 * splines2, splines1 * splines2)
+        assert penalties1.shape == expected_shape
+        assert penalties2.shape == expected_shape
+        assert np.allclose(penalties1, penalties2)
+
+    @pytest.mark.parametrize("n_splines", [[2, 4, 3, 6], [2, 3, 4], [7, 4]])
+    def test_that_creation_methods_are_equal_arbitrary_dimension(self, n_splines):
+
+        # Build up using args directly in te()
+        tensor_features = tuple(range(len(n_splines)))
+        tensor1 = te(*tensor_features, n_splines=n_splines)
+        assert tensor1.n_coefs == np.prod(n_splines)
+
+        # Build up by first building spline terms, then passing those to te()
+        te_args = [s(i, n_splines=splines) for (i, splines) in enumerate(n_splines)]
+        tensor2 = te(*te_args)
+        assert tensor2.n_coefs == np.prod(n_splines)
+
+        penalties1 = tensor1.build_penalties().A
+        penalties2 = tensor2.build_penalties().A
+        expected_shape = tuple([np.prod(n_splines)] * 2)
+        assert penalties1.shape == expected_shape
+        assert penalties2.shape == expected_shape
+        assert np.allclose(penalties1, penalties2)
+
+
+class TestBasicPenalties:
+    def test_that_linear_betas_get_no_penalty(self):
+        from pygam import s
+
+        n_splines = 10
+        spline = s(0, n_splines=n_splines, lam=1)
+        x = np.arange(n_splines)
+        assert np.allclose((spline.build_penalties() @ x)[1:-1], 0)
+
+    def test_that_quadratic_betas_get_constant_penalty(self):
+        from pygam import s
+
+        n_splines = 10
+        spline = s(0, n_splines=n_splines, lam=1)
+        x = np.arange(n_splines)
+
+        # Close to 2, but with errors at the boundaries
+        ans = np.array([2.0] * 8)
+        assert np.allclose((spline.build_penalties() @ x**2)[1:-1], ans)
+
+
+class TestRegressions:
     def test_no_auto_dtype(self):
         with pytest.raises(ValueError):
             SplineTerm(feature=0, dtype="auto")
@@ -339,11 +398,11 @@ class TestRegressions(object):
         term = SplineTerm(feature=0, penalties=["auto", "none"])
 
         # penalties should be equivalent
-        assert (term.build_penalties() == base_term.build_penalties()).A.all()
+        assert (term.build_penalties() == base_term.build_penalties()).all()
 
         # multitple penalties should be additive, not multiplicative,
         # so 'none' penalty should have no effect
-        assert np.abs(term.build_penalties().A).sum() > 0
+        assert np.abs(term.build_penalties()).sum() > 0
 
     def test_compose_constraints(self, hepatitis_X_y):
         """we should be able to compose penalties
@@ -366,3 +425,49 @@ class TestRegressions(object):
 
         gam = PoissonGAM(s(0, constraints="monotonic_inc") + te(3, 1) + s(2)).fit(X, y)
         assert gam._is_fitted
+
+
+if __name__ == "__main__":
+    import pytest
+
+    pytest.main(
+        args=[
+            __file__,
+            "-v",
+            "--capture=sys",
+            "--doctest-modules",
+            "-k test_tensor_composite_constraints_equal_penalties",
+        ]
+    )
+
+    # This dataset only has one feature
+    from pygam.datasets import hepatitis
+
+    X, y = hepatitis(True)
+
+    # Add a random interaction data
+    rng = np.random.default_rng(1)
+    X = np.c_[X, rng.normal(size=X.shape[0])]
+    X = rng.normal(size=(100, 2))
+    X = X[np.argsort(X[:, 0]), :]
+    y = 1 / (1 + np.exp(-X[:, 0]))
+
+    # constrain useless dimension
+    gam_useless_constraint = LinearGAM(te(0, 1, constraints=["none", "monotonic_dec"], n_splines=[10, 4], lam=[1, 1]))
+    gam_useless_constraint.fit(X, y)
+
+    # constrain informative dimension
+    gam_constrained = LinearGAM(te(0, 1, constraints=["monotonic_dec", "none"], n_splines=[10, 4], lam=[1, 1]))
+    gam_constrained.fit(X, y)
+
+    import matplotlib.pyplot as plt
+
+    plt.scatter(X[:, 0], y)
+    plt.plot(X[:, 0], gam_useless_constraint.predict(X), color="red")
+    plt.plot(X[:, 0], gam_constrained.predict(X), color="black")
+
+    print(gam_useless_constraint.statistics_["pseudo_r2"]["explained_deviance"])
+    print(gam_constrained.statistics_["pseudo_r2"]["explained_deviance"])
+
+    assert gam_useless_constraint.statistics_["pseudo_r2"]["explained_deviance"] > 0.5
+    assert gam_constrained.statistics_["pseudo_r2"]["explained_deviance"] < 0.1

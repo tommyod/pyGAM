@@ -39,7 +39,11 @@ def validate_callback_data(method):
         expected = method.__code__.co_varnames
 
         # rename curret gam object
-        if "self" in kwargs:
+        if "gam" in kwargs:
+            gam = kwargs["gam"]
+            del kwargs["gam"]
+            kwargs["gam"] = gam
+        elif "self" in kwargs:
             gam = kwargs["self"]
             del kwargs["self"]
             kwargs["gam"] = gam
@@ -201,21 +205,21 @@ class Diffs(CallBack):
         -------
         None
         """
-        super().__init__(name="diffs")
+        super().__init__(name="relative_change")
 
-    def on_loop_end(self, diff):
+    def on_loop_end(self, relative_change):
         """
         runs the method at end of each optimization loop
 
         Parameters
         ----------
-        diff : float
+        relative_change : float
 
         Returns
         -------
         diff : float
         """
-        return diff
+        return relative_change
 
 
 @validate_callback

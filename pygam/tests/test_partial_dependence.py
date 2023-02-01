@@ -1,15 +1,12 @@
 # -*- coding: utf-8 -*-
 
-import sys
-
-import numpy as np
 import pytest
-import scipy as sp
 
-from pygam import *
+from pygam import LinearGAM, PoissonGAM, s, te
+from pygam.datasets import chicago
 
 
-class TestPartialDepencence(object):
+class TestPartialDepencence:
     def test_partial_dependence_on_univar_data(self, mcycle_X_y):
         """
         partial dependence with univariate data should equal the overall model
@@ -69,14 +66,16 @@ class TestPartialDepencence(object):
             assert pdep.shape == (100 ** len(term),)
             assert confi.shape == (100 ** len(term), 2)
 
-    def test_partial_dependence_gives_correct_shape_with_meshgrid(self, chicago_gam, chicago_X_y):
+    def test_partial_dependence_gives_correct_shape_with_meshgrid(self):
         """
         when `meshgrid=True`, partial dependence method should return
         - pdep is meshes with the dimension of the term
         - confi is meshes with the dimension of the term, and number of confis
         """
-        # specify X
-        X, y = chicago_X_y
+
+        X, y = chicago(True)
+        chicago_gam = PoissonGAM(terms=s(0, n_splines=200) + te(3, 1) + s(2)).fit(X, y)
+
         for i, term in enumerate(chicago_gam.terms):
             if term.isintercept:
                 continue
@@ -133,10 +132,10 @@ class TestPartialDepencence(object):
 
         gam_intercept = LinearGAM(fit_intercept=True).fit(X, y)
         with pytest.raises(ValueError):
-            pdeps = gam_intercept.partial_dependence(term=-1)
+            gam_intercept.partial_dependence(term=-1)
 
         gam_no_intercept = LinearGAM(fit_intercept=False).fit(X, y)
-        pdeps = gam_no_intercept.partial_dependence(term=-1)
+        gam_no_intercept.partial_dependence(term=-1)
 
     def test_no_X_needed_for_partial_dependence(self, mcycle_gam):
         """
@@ -144,3 +143,16 @@ class TestPartialDepencence(object):
         """
         XX = mcycle_gam.generate_X_grid(term=0)
         assert (mcycle_gam.partial_dependence(term=0) == mcycle_gam.partial_dependence(term=0, X=XX)).all()
+
+
+if __name__ == "__main__":
+
+    pytest.main(
+        args=[
+            __file__,
+            "-v",
+            "--capture=sys",
+            "--doctest-modules",
+            # "-k test_partial_dependence_gives_correct_shape_with_meshgrid",
+        ]
+    )

@@ -274,7 +274,7 @@ def round_to_n_decimal_places(array, n=3):
 
 
 # Credit to Hugh Bothwell from http://stackoverflow.com/questions/5084743/how-to-print-pretty-string-output-in-python
-class TablePrinter(object):
+class TablePrinter:
     "Print a list of dicts as a table"
 
     def __init__(self, fmt, sep=" ", ul=None):
@@ -421,12 +421,13 @@ def b_spline_basis(x, edge_knots, n_splines=20, spline_order=3, sparse=True, per
 
     # Use sklearn here
     # TODO: Support knots?
+    include_bias = True
     transformer = SplineTransformer(
-        n_knots=n_splines + 1 + (0 if periodic else -spline_order),
+        n_knots=n_splines + 2 - include_bias + (0 if periodic else -spline_order),
         degree=spline_order,
         knots="uniform",
         extrapolation="periodic" if periodic else "linear",
-        include_bias=True,
+        include_bias=include_bias,
         order="C",
     )
 
@@ -468,13 +469,12 @@ def isiterable(obj, reject_string=True):
 def flatten(iterable):
     """convenience tool to flatten any nested iterable
 
-    example:
-
-        flatten([[[],[4]],[[[5,[6,7, []]]]]])
-        >>> [4, 5, 6, 7]
-
-        flatten('hello')
-        >>> 'hello'
+    Examples
+    --------
+    >>> flatten([[[],[4]],[[[5,[6,7, []]]]]])
+    [4, 5, 6, 7]
+    >>> flatten('hello')
+    'hello'
 
     Parameters
     ----------
@@ -509,7 +509,6 @@ def tensor_product(a, b, reshape=True):
     Parameters
     ---------
     a : array-like of shape (n, m_a)
-
     b : array-like of shape (n, m_b)
 
     reshape : bool, default True
@@ -524,9 +523,38 @@ def tensor_product(a, b, reshape=True):
         (n, m_a * m_b) if reshape = True.
     or
         (n, m_a, m_b) otherwise
+
+    Examples
+    --------
+    >>> A = np.eye(3, dtype=int)
+    >>> B = np.arange(9).reshape(3, 3)
+    >>> tensor_product(A, B)
+    array([[0, 1, 2, 0, 0, 0, 0, 0, 0],
+           [0, 0, 0, 3, 4, 5, 0, 0, 0],
+           [0, 0, 0, 0, 0, 0, 6, 7, 8]])
+    >>> A = np.diag([1, 2, 3])
+    >>> A[0, :] = [1, 2, 3]
+    >>> tensor_product(A, B, reshape=True)
+    array([[ 0,  1,  2,  0,  2,  4,  0,  3,  6],
+           [ 0,  0,  0,  6,  8, 10,  0,  0,  0],
+           [ 0,  0,  0,  0,  0,  0, 18, 21, 24]])
+    >>> tensor_product(A, B, reshape=False)
+    array([[[ 0,  1,  2],
+            [ 0,  2,  4],
+            [ 0,  3,  6]],
+    <BLANKLINE>
+           [[ 0,  0,  0],
+            [ 6,  8, 10],
+            [ 0,  0,  0]],
+    <BLANKLINE>
+           [[ 0,  0,  0],
+            [ 0,  0,  0],
+            [18, 21, 24]]])
+
+
     """
-    assert a.ndim == 2, "matrix a must be 2-dimensional, but found {} dimensions".format(a.ndim)
-    assert b.ndim == 2, "matrix b must be 2-dimensional, but found {} dimensions".format(b.ndim)
+    assert a.ndim == 2, f"matrix a must be 2-dimensional, but found {a.ndim} dimensions"
+    assert b.ndim == 2, f"matrix b must be 2-dimensional, but found {b.nim} dimensions"
 
     na, ma = a.shape
     nb, mb = b.shape
@@ -546,3 +574,15 @@ def tensor_product(a, b, reshape=True):
         return tensor.reshape(na, ma * mb)
 
     return tensor
+
+
+if __name__ == "__main__":
+    import pytest
+
+    pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules"])
+
+    A = np.diag([1, 2, 3])
+    A[0, :] = [1, 2, 3]
+    B = np.arange(9).reshape(3, 3)
+    T = tensor_product(A, B, False)
+    print(T)

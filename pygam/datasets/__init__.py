@@ -32,3 +32,23 @@ __all__ = [
     "chicago",
     "toy_interaction",
 ]
+
+if __name__ == "__main__":
+    DATASETS = [
+        cake,
+        chicago,
+        coal,
+        default,
+        faithful,
+        head_circumference,
+        hepatitis,
+        mcycle,
+        toy_classification,
+        toy_interaction,
+        trees,
+        wage,
+    ]
+
+    for data_loader in DATASETS:
+        X, y = data_loader()
+        print(data_loader, X.shape)

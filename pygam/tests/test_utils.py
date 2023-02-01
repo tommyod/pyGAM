@@ -2,18 +2,11 @@
 
 from copy import deepcopy
 
-try:
-    # py >= 3.3
-    from unittest.mock import patch
-except ImportError:
-    # py < 3.3
-    from mock import patch
-
 import numpy as np
 import pytest
 
-from pygam import *
-from pygam.utils import check_X, check_y, sig_code
+from pygam import LinearGAM, LogisticGAM, f, s
+from pygam.utils import check_X, check_y, sig_code, tensor_product
 
 # TODO check dtypes works as expected
 # TODO checkX, checky, check XY expand as needed, call out bad domain
@@ -80,7 +73,6 @@ def test_check_y_not_min_samples(wage_X_y, wage_gam):
 def test_check_y_not_in_domain_link(default_X_y, default_gam):
     """if you give labels outide of the links domain, check_y will raise an error"""
     X, y = default_X_y
-    gam = default_gam
 
     with pytest.raises(ValueError):
         check_y(y + 0.1, default_gam.link, default_gam.distribution, verbose=False)
@@ -178,7 +170,7 @@ def test_catch_chol_pos_def_error(default_X_y):
     doing a gridsearch with a poorly conditioned penalty matrix should not crash
     """
     X, y = default_X_y
-    gam = LogisticGAM().gridsearch(X, y, lam=np.logspace(10, 12, 3))
+    LogisticGAM().gridsearch(X, y, lam=np.logspace(10, 12, 3))
 
 
 def test_pvalue_sig_codes():
@@ -214,15 +206,9 @@ def test_b_spline_basis_extrapolates(mcycle_X_y):
     assert np.allclose(slopes[0], slopes[1], atol=1e-2)
 
 
-def test_no_SKSPIMPORT(mcycle_X_y):
-    """make sure our module work with and without scikit-sparse"""
-    from pygam.optimization import SKSPIMPORT
+if __name__ == "__main__":
+    A = np.eye(3)
+    B = np.arange(9).reshape(3, 3)
+    T = tensor_product(A, B)
 
-    if SKSPIMPORT:
-        with patch("pygam.utils.SKSPIMPORT", new=False) as SKSPIMPORT_patch:
-            from pygam.utils import SKSPIMPORT
-
-            assert SKSPIMPORT == False
-
-            X, y = mcycle_X_y
-            assert LinearGAM().fit(X, y)._is_fitted
+    print(T)

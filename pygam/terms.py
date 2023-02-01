@@ -1,6 +1,9 @@
 """
 Link functions
 """
+import collections.abc
+import functools
+import numbers
 import warnings
 from abc import ABCMeta, abstractmethod, abstractproperty
 from collections import defaultdict
@@ -10,13 +13,17 @@ import numpy as np
 import scipy as sp
 
 from pygam.core import Core, nice_repr
+from pygam.log import setup_custom_logger
 from pygam.penalties import CONSTRAINTS, PENALTIES
 from pygam.utils import b_spline_basis, check_param, flatten, gen_edge_knots, isiterable, tensor_product
 
+logger = setup_custom_logger(__name__)
 
-class Term(Core):
-    __metaclass__ = ABCMeta
 
+EPS = np.finfo(np.float64).eps  # machine epsilon
+
+
+class Term(Core, metaclass=ABCMeta):
     def __init__(
         self,
         feature,
@@ -134,63 +141,67 @@ class Term(Core):
         )
 
     def _validate_arguments(self):
-        """method to sanitize model parameters
-
-        Parameters
-        ---------
-        None
-
-        Returns
-        -------
-        None
-        """
+        """Validate and sanitize arguments."""
         # dtype
         if self.dtype not in ["numerical", "categorical"]:
-            raise ValueError("dtype must be in ['numerical','categorical'], " "but found dtype = {}".format(self.dtype))
+            msg = f"dtype must be in ['numerical', 'categorical'], found dtype = {self.dtype}"
+            raise ValueError(msg)
 
         # fit_linear XOR fit_splines
         if self.fit_linear == self.fit_splines:
-            raise ValueError(
-                "term must have fit_linear XOR fit_splines, but found: "
-                "fit_linear= {}, fit_splines={}".format(self.fit_linear, self.fit_splines)
-            )
+            msg = "Either 'fit_linear' or 'fit_splines' must be True, but not both."
+            raise ValueError(msg)
 
-        # penalties
-        if not isiterable(self.penalties):
-            self.penalties = [self.penalties]
+        # Convert to list
+        self.penalties = (
+            [self.penalties]
+            if (isinstance(self.penalties, str) or self.penalties is None or callable(self.penalties))
+            else list(self.penalties)
+        )
 
-        for i, p in enumerate(self.penalties):
-            if not (hasattr(p, "__call__") or (p in PENALTIES) or (p is None)):
-                raise ValueError(
-                    "penalties must be callable or in "
-                    "{}, but found {} for {}th penalty".format(list(PENALTIES.keys()), p, i)
-                )
+        # Validate each penalty
+        for i, penalty in enumerate(self.penalties):
+            is_callable = callable(penalty)
+            is_valid_str = penalty in PENALTIES
+            is_None = penalty is None
+
+            if not any((is_callable, is_valid_str, is_None)):
+                msg = f"Penalty number {i} ({penalty}) not in {list(PENALTIES.keys())}"
+                raise ValueError(msg)
 
         # check lams and distribute to penalites
-        if not isiterable(self.lam):
+        if not isinstance(self.lam, collections.abc.Iterable):
             self.lam = [self.lam]
 
         for lam in self.lam:
-            check_param(lam, param_name="lam", dtype="float", constraint=">= 0")
+            if not isinstance(lam, numbers.Real):
+                raise TypeError("Parameter 'lam' must be a number")
+            if lam < 0:
+                raise ValueError("Paramter 'lam' must be >= 0")
 
         if len(self.lam) == 1:
             self.lam = self.lam * len(self.penalties)
 
         if len(self.lam) != len(self.penalties):
-            raise ValueError(
-                "expected 1 lam per penalty, but found " "lam = {}, penalties = {}".format(self.lam, self.penalties)
-            )
+            msg = f"Length of penalties ({len(self.penalties)}) does not match length of lam ({len(self.lam)})"
+            raise ValueError(msg)
 
         # constraints
-        if not isiterable(self.constraints):
-            self.constraints = [self.constraints]
+        self.constraints = (
+            [self.constraints]
+            if (isinstance(self.constraints, str) or self.constraints is None or callable(self.constraints))
+            else list(self.constraints)
+        )
 
-        for i, c in enumerate(self.constraints):
-            if not (hasattr(c, "__call__") or (c in CONSTRAINTS) or (c is None)):
-                raise ValueError(
-                    "constraints must be callable or in "
-                    "{}, but found {} for {}th constraint".format(list(CONSTRAINTS.keys()), c, i)
-                )
+        # Validate each constraint
+        for i, constraint in enumerate(self.constraints):
+            is_callable = callable(constraint)
+            is_valid_str = constraint in CONSTRAINTS
+            is_None = constraint is None
+
+            if not any((is_callable, is_valid_str, is_None)):
+                msg = f"Constraint number {i} ({constraint}) not in {list(CONSTRAINTS.keys())}"
+                raise ValueError(msg)
 
         return self
 
@@ -289,6 +300,21 @@ class Term(Core):
         """
         pass
 
+    def _determine_auto(self):
+        """Map 'auto' penalty to appropriate penalty type."""
+        if self.dtype == "numerical":
+            if self._name == "spline_term":
+                if self.basis in ["cp"]:
+                    penalty = "periodic"
+                else:
+                    penalty = "derivative"
+            else:
+                penalty = "l2"
+        if self.dtype == "categorical":
+            penalty = "l2"
+
+        return penalty
+
     def build_penalties(self, verbose=False):
         """
         builds the GAM block-diagonal penalty matrix in quadratic form
@@ -308,32 +334,42 @@ class Term(Core):
         -------
         P : sparse CSC matrix containing the model penalties in quadratic form
         """
+        logger.debug(f"Building penalty matrix for term: {self.get_params()}")
+
         if self.isintercept:
             return np.array([[0.0]])
 
-        Ps = []
+        penalty_matrices = []
         for penalty, lam in zip(self.penalties, self.lam):
+
             if penalty == "auto":
-                if self.dtype == "numerical":
-                    if self._name == "spline_term":
-                        if self.basis in ["cp"]:
-                            penalty = "periodic"
-                        else:
-                            penalty = "derivative"
-                    else:
-                        penalty = "l2"
-                if self.dtype == "categorical":
-                    penalty = "l2"
-            if penalty is None:
+                penalty = self._determine_auto()
+            elif penalty is None:
                 penalty = "none"
+
             if penalty in PENALTIES:
                 penalty = PENALTIES[penalty]
 
-            P = penalty(self.n_coefs, coef=None)  # penalties dont need coef
-            Ps.append(np.multiply(P, lam))
-        return np.sum(Ps)
+            if not callable(penalty):
+                raise TypeError(f"'penalty must be callable. Found: {penalty}'")
 
-    def build_constraints(self, coef, constraint_lam, constraint_l2):
+            penalty_matrix = penalty(self.n_coefs)  # penalties dont need coef
+
+            # Multiply by penalty, we want the square root of the quaddratic form
+            # lam coef^T P^T P coef
+            # so we create sqrt(lam) P here
+            penalty_matrix = penalty_matrix * np.sqrt(lam)
+            # penalty_matrix = penalty_matrix + np.eye(self.n_coefs) * 1e-1
+
+            penalty_matrices.append(penalty_matrix)
+
+        # Sum to a single (n_coefs, n_coefs) matrix
+        penalty_matrix = np.sum(penalty_matrices, axis=0)
+        assert isinstance(penalty_matrix, np.ndarray)
+        assert penalty_matrix.shape == (self.n_coefs, self.n_coefs)
+        return penalty_matrix
+
+    def build_constraints(self, coef, constraint_lam):
         """
         builds the GAM block-diagonal constraint matrix in quadratic form
         out of constraint matrices specified for each feature.
@@ -349,12 +385,6 @@ class Term(Core):
 
             typically this is a very large number.
 
-        constraint_l2 : float,
-            loading to improve the numerical conditioning of the constraint
-            matrix.
-
-            typically this is a very small number.
-
         Returns
         -------
         C : sparse CSC matrix containing the model constraints in quadratic form
@@ -362,7 +392,7 @@ class Term(Core):
         if self.isintercept:
             return np.array([[0.0]])
 
-        Cs = []
+        constraint_matrices = []
         for constraint in self.constraints:
 
             if constraint is None:
@@ -370,17 +400,17 @@ class Term(Core):
             if constraint in CONSTRAINTS:
                 constraint = CONSTRAINTS[constraint]
 
-            C = constraint(self.n_coefs, coef) * constraint_lam
-            Cs.append(C)
+            if not callable(constraint):
+                raise TypeError(f"'constraint must be callable. Found: {constraint}'")
 
-        Cs = np.sum(Cs)
+            C = constraint(coef) * np.sqrt(constraint_lam)
+            constraint_matrices.append(C)
 
-        # improve condition
-        # TODO: np.array has no nnz member
-        if Cs.nnz > 0:
-            Cs += sp.sparse.diags(constraint_l2 * np.ones(Cs.shape[0]))
-
-        return Cs
+        # Sum to a single (n_coefs, n_coefs) matrix
+        constraint_matrix = np.sum(constraint_matrices, axis=0)
+        assert isinstance(constraint_matrix, np.ndarray)
+        assert constraint_matrix.shape == (self.n_coefs, self.n_coefs)
+        return constraint_matrix
 
 
 class Intercept(Term):
@@ -728,20 +758,17 @@ class SplineTerm(Term):
         super()._validate_arguments()
 
         if self.basis not in self._bases:
-            raise ValueError("basis must be one of {}, " "but found: {}".format(self._bases, self.basis))
+            raise ValueError(f"basis must be one of {self._bases}, but found: {self.basis}")
 
         # n_splines
-        self.n_splines = check_param(self.n_splines, param_name="n_splines", dtype="int", constraint=">= 0")
+        if not isinstance(self.n_splines, numbers.Integral):
+            raise TypeError("Argument 'n_splines' must be an integer")
+
+        if self.n_splines < 0:
+            raise ValueError("Argument 'n_splines' must be >= 0")
 
         # spline_order
         self.spline_order = check_param(self.spline_order, param_name="spline_order", dtype="int", constraint=">= 0")
-
-        # n_splines + spline_order
-        if not self.n_splines > self.spline_order:
-            raise ValueError(
-                "n_splines must be > spline_order. "
-                "found: n_splines = {} and spline_order = {}".format(self.n_splines, self.spline_order)
-            )
 
         # by
         if self.by is not None:
@@ -895,7 +922,8 @@ class FactorTerm(SplineTerm):
         """
         super()._validate_arguments()
         if self.coding not in self._encodings:
-            raise ValueError("coding must be one of {}, " "but found: {}".format(self._encodings, self.coding))
+            msg = f"coding must be one of {self._encodings}, but found: {self.coding}"
+            raise ValueError(msg)
 
         return self
 
@@ -947,7 +975,7 @@ class FactorTerm(SplineTerm):
         return self.n_splines - 1 * (self.coding in ["dummy"])
 
 
-class MetaTermMixin(object):
+class MetaTermMixin:
     _plural = [
         "feature",
         "dtype",
@@ -1169,17 +1197,17 @@ class TensorTerm(SplineTerm, MetaTermMixin):
         for k, v in kwargs.items():
             if isiterable(v):
                 if len(v) != m:
-                    raise ValueError("Expected {} to have length {}, but found {} = {}".format(k, m, k, v))
+                    msg = f"Expected {k} to have length {m}, but found {k} = {v}"
+                    raise ValueError(msg)
             else:
                 kwargs[k] = [v] * m
 
         terms = []
         for i, arg in enumerate(np.atleast_1d(args)):
-            if isinstance(arg, TensorTerm):
-                raise ValueError(
-                    "TensorTerm does not accept other TensorTerms. "
-                    "Please build a flat TensorTerm instead of a nested one."
-                )
+            if isinstance(arg, type(self)):
+                msg = "TensorTerm does not accept other TensorTerms.\n"
+                msg += "Please build a flat TensorTerm instead of a nested one."
+                raise ValueError(msg)
 
             if isinstance(arg, Term):
                 if self.verbose and kwargs:
@@ -1256,10 +1284,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
     @property
     def hasconstraint(self):
         """bool, whether the term has any constraints"""
-        constrained = False
-        for term in self._terms:
-            constrained = constrained or term.hasconstraint
-        return constrained
+        return any(term.hasconstraint for term in self._terms)
 
     @property
     def n_coefs(self):
@@ -1285,9 +1310,8 @@ class TensorTerm(SplineTerm, MetaTermMixin):
             term.compile(X, verbose=False)
 
         if self.by is not None and self.by >= X.shape[1]:
-            raise ValueError(
-                "by variable requires feature {}, " "but X has only {} dimensions".format(self.by, X.shape[1])
-            )
+            msg = f"by variable requires feature {self.by}, but X has only {X.shape[1]} dimensions"
+            raise ValueError(msg)
         return self
 
     def build_columns(self, X, verbose=False):
@@ -1305,10 +1329,8 @@ class TensorTerm(SplineTerm, MetaTermMixin):
         -------
         scipy sparse array with n rows
         """
-        splines = self._terms[0].build_columns(X, verbose=verbose)
-        for term in self._terms[1:]:
-            marginal_splines = term.build_columns(X, verbose=verbose)
-            splines = tensor_product(splines, marginal_splines)
+        columns_list = [term.build_columns(X, verbose=verbose) for term in self._terms]
+        splines = functools.reduce(tensor_product, columns_list)
 
         if self.by is not None:
             splines *= X[:, self.by][:, np.newaxis]
@@ -1334,7 +1356,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
         P : sparse CSC matrix containing the model penalties in quadratic form
         """
         P = sp.sparse.csc_matrix((self.n_coefs, self.n_coefs))
-        for i in range(len(self._terms)):
+        for i, _ in enumerate(self._terms):
             P += self._build_marginal_penalties(i)
 
         return sp.sparse.csc_matrix(P)
@@ -1355,7 +1377,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
 
         return P_total
 
-    def build_constraints(self, coef, constraint_lam, constraint_l2):
+    def build_constraints(self, coef, constraint_lam):
         """
         builds the GAM block-diagonal constraint matrix in quadratic form
         out of constraint matrices specified for each feature.
@@ -1369,23 +1391,17 @@ class TensorTerm(SplineTerm, MetaTermMixin):
 
             typically this is a very large number.
 
-        constraint_l2 : float,
-            loading to improve the numerical conditioning of the constraint
-            matrix.
-
-            typically this is a very small number.
-
         Returns
         -------
         C : sparse CSC matrix containing the model constraints in quadratic form
         """
         C = sp.sparse.csc_matrix((self.n_coefs, self.n_coefs))
-        for i in range(len(self._terms)):
-            C += self._build_marginal_constraints(i, coef, constraint_lam, constraint_l2)
+        for i, _ in enumerate(self._terms):
+            C += self._build_marginal_constraints(i, coef, constraint_lam)
 
         return sp.sparse.csc_matrix(C)
 
-    def _build_marginal_constraints(self, i, coef, constraint_lam, constraint_l2):
+    def _build_marginal_constraints(self, i, coef, constraint_lam):
         """builds a constraint matrix for a marginal term in the tensor term
 
         takes a tensor's coef vector, and slices it into pieces corresponding
@@ -1404,12 +1420,6 @@ class TensorTerm(SplineTerm, MetaTermMixin):
 
             typically this is a very large number.
 
-        constraint_l2 : float,
-            loading to improve the numerical conditioning of the constraint
-            matrix.
-
-            typically this is a very small number.
-
         Returns
         -------
         C : sparse CSC matrix containing the model constraints in quadratic form
@@ -1422,10 +1432,10 @@ class TensorTerm(SplineTerm, MetaTermMixin):
             coef_slice = coef[slice_]
 
             # build the constraint matrix for that slice
-            slice_C = self._terms[i].build_constraints(coef_slice, constraint_lam, constraint_l2)
+            slice_C = self._terms[i].build_constraints(coef_slice, constraint_lam)
 
             # now enter it into the composite
-            composite_C[tuple(np.meshgrid(slice_, slice_))] = slice_C.A
+            composite_C[tuple(np.meshgrid(slice_, slice_))] = slice_C
 
         return sp.sparse.csc_matrix(composite_C)
 
@@ -1444,18 +1454,36 @@ class TensorTerm(SplineTerm, MetaTermMixin):
         ------
         np.ndarray of ints
         """
+        # Example: dims = [2, 3, 4]
         dims = [term_.n_coefs for term_ in self]
 
         # make all linear indices
+        # Example: array([0, 1, 2, ... , 22, 23])
         idxs = np.arange(np.prod(dims))
 
         # reshape indices to a Nd matrix
+        # Example has shape (2, 3, 4) and entries
+        # array([[[ 0,  1,  2,  3],
+        #         [ 4,  5,  6,  7],
+        #         [ 8,  9, 10, 11]],
+
+        #        [[12, 13, 14, 15],
+        #         [16, 17, 18, 19],
+        #         [20, 21, 22, 23]]])
         idxs = idxs.reshape(dims)
 
         # reshape to a 2d matrix, where we can loop over rows
-        idxs = np.moveaxis(idxs, i, 0).reshape(idxs.shape[i], int(idxs.size / idxs.shape[i]))
+        # Example (with i=0)
+        # array([[ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11],
+        #        [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]])
+        idxs = np.moveaxis(idxs, i, 0).reshape(idxs.shape[i], idxs.size // idxs.shape[i])
 
         # loop over rows
+        # Example yields:
+        # -> [ 0 12]
+        # -> [ 1 13]
+        # ...
+        # -> [11 23]
         for slice_ in idxs.T:
             yield slice_
 
@@ -1531,7 +1559,8 @@ class TermList(Core, MetaTermMixin):
                 for term_ in term._terms:
                     term_list = deduplicate(term_, term_list, uniques)
             else:
-                raise ValueError("terms must be instances of Term or TermList, " "but found term: {}".format(term))
+                msg = f"Invalid object added to TermList: {term}"
+                raise TypeError(msg)
 
         self._terms = self._terms + term_list
         self._exclude = [
@@ -1724,12 +1753,9 @@ class TermList(Core, MetaTermMixin):
         -------
         P : sparse CSC matrix containing the model penalties in quadratic form
         """
-        P = []
-        for term in self._terms:
-            P.append(term.build_penalties())
-        return sp.sparse.block_diag(P)
+        return sp.sparse.block_diag([term.build_penalties() for term in self._terms])
 
-    def build_constraints(self, coefs, constraint_lam, constraint_l2):
+    def build_constraints(self, coefs, constraint_lam):
         """
         builds the GAM block-diagonal constraint matrix in quadratic form
         out of constraint matrices specified for each feature.
@@ -1745,12 +1771,6 @@ class TermList(Core, MetaTermMixin):
 
             typically this is a very large number.
 
-        constraint_l2 : float,
-            loading to improve the numerical conditioning of the constraint
-            matrix.
-
-            typically this is a very small number.
-
         Returns
         -------
         C : sparse CSC matrix containing the model constraints in quadratic form
@@ -1758,8 +1778,11 @@ class TermList(Core, MetaTermMixin):
         C = []
         for i, term in enumerate(self._terms):
             idxs = self.get_coef_indices(i=i)
-            C.append(term.build_constraints(coefs[idxs], constraint_lam, constraint_l2))
-        return sp.sparse.block_diag(C)
+            C.append(term.build_constraints(coefs[idxs], constraint_lam))
+
+        block_matrix = sp.sparse.block_diag(C)
+        assert block_matrix.shape[0] == block_matrix.shape[1]
+        return block_matrix
 
 
 # Minimal representations
@@ -1843,3 +1866,11 @@ TERMS = {
     "tensor_term": TensorTerm,
     "term_list": TermList,
 }
+
+
+if __name__ == "__main__":
+
+    spline = s(0, n_splines=10, lam=1)
+    spline2 = s(0, n_splines=10, lam=1)
+
+    spline + spline2

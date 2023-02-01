@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import scipy as sp
 
-from pygam import *
+from pygam import GAM, ExpectileGAM, LinearGAM, LogisticGAM, PoissonGAM, f, l, s
 
 
 def test_LinearGAM_prediction(mcycle_X_y, mcycle_gam):
@@ -172,6 +172,7 @@ def test_summary_returns_12_lines(mcycle_gam):
     sys.stdout = StringIO()  # Choose a file-like object to write to
     mcycle_gam.summary()
     assert len(sys.stdout.getvalue().split("\n")) == 24
+    sys.stdout = stdout
 
 
 def test_is_fitted_predict(mcycle_X_y):
@@ -271,7 +272,7 @@ def test_get_params():
     assert params["lam"] == 420
 
 
-class TestSamplingFromPosterior(object):
+class TestSamplingFromPosterior:
     def test_drawing_samples_from_unfitted_model(self, mcycle_X_y, mcycle_gam):
         X, y = mcycle_X_y
         gam = LinearGAM()
@@ -475,7 +476,7 @@ def test_fit_quantile_raises_ValueError(head_circumference_X_y):
         ExpectileGAM().fit_quantile(X, y, max_iter=-1, quantile=0.5)
 
 
-class TestRegressions(object):
+class TestRegressions:
     def test_pvalue_invariant_to_scale(self, wage_X_y):
         """
         regression test.

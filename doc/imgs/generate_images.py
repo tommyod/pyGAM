@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 import pathlib
 
-from pygam import *
+from pygam import LinearGAM, s, PoissonGAM, GAM, f, te, ExpectileGAM, LogisticGAM
 from pygam.datasets import (
     hepatitis,
     wage,
@@ -36,18 +36,17 @@ OUTPUT_DIRECTORY = (pathlib.Path(".") / ".." / ".." / "imgs").resolve()
 
 def gen_basis_fns():
     X, y = hepatitis()
-    gam = LinearGAM(lam=0.6, fit_intercept=False).fit(X, y)
+    gam = LinearGAM(lam=1,n_splines=16,  fit_intercept=True).fit(X, y)
     XX = gam.generate_X_grid(term=0, n=500)
 
-    plt.figure()
     fig, ax = plt.subplots(2, 1)
-    ax[0].plot(XX, gam._modelmat(XX, term=0).A)
     ax[0].set_title("b-Spline Basis Functions")
+    ax[0].plot(XX, gam._modelmat(XX, term=0).A)
 
-    ax[1].scatter(X, y, facecolor="gray", edgecolors="none")
-    ax[1].plot(XX, gam._modelmat(XX).A * gam.coef_)
+    ax[1].set_title("Fitted Model (intercept not shown)")
+    ax[1].scatter(X, y, facecolor="gray", edgecolors="none", s=10)
+    ax[1].plot(XX, gam._modelmat(XX).A[:, :-1] * gam.coef_[:-1])
     ax[1].plot(XX, gam.predict(XX), "k")
-    ax[1].set_title("Fitted Model")
     fig.tight_layout()
     plt.savefig(OUTPUT_DIRECTORY / "pygam_basis.png", dpi=300)
 
@@ -100,21 +99,21 @@ def mcycle_data_linear():
 
     XX = gam.generate_X_grid(term=0)
     plt.figure()
+    plt.title("95% prediction interval")
     plt.scatter(X, y, facecolor="gray", edgecolors="none")
     plt.plot(XX, gam.predict(XX), "r--")
     plt.plot(XX, gam.prediction_intervals(XX, width=0.95), color="b", ls="--")
-    plt.title("95% prediction interval")
 
     plt.savefig(OUTPUT_DIRECTORY / "pygam_mcycle_data_linear.png", dpi=300)
 
     m = X.min()
     M = X.max()
-    XX = np.linspace(m - 10, M + 10, 500)
-    Xl = np.linspace(m - 10, m, 50)
-    Xr = np.linspace(M, M + 10, 50)
+    XX = np.linspace(m - 10, M + 10, 500).reshape(-1, 1)
+    Xl = np.linspace(m - 10, m, 50).reshape(-1, 1)
+    Xr = np.linspace(M, M + 10, 50).reshape(-1, 1)
 
     plt.figure()
-
+    plt.title("Extrapolation")
     plt.plot(XX, gam.predict(XX), "k")
     plt.plot(Xl, gam.confidence_intervals(Xl), color="b", ls="--")
     plt.plot(Xr, gam.confidence_intervals(Xr), color="b", ls="--")
@@ -129,17 +128,24 @@ def wage_data_linear():
     gam = LinearGAM(s(0) + s(1) + f(2))
     gam.gridsearch(X, y, lam=np.logspace(-5, 3, 50))
 
-    plt.figure()
-    fig, axs = plt.subplots(1, 3)
+    fig, axs = plt.subplots(1, 3, figsize=(8, 2.5))
+    fig.suptitle("GAM fitted on wage data", y=0.9, fontsize=12)
 
     titles = ["year", "age", "education"]
     for i, ax in enumerate(axs):
         XX = gam.generate_X_grid(term=i)
-        ax.plot(XX[:, i], gam.partial_dependence(term=i, X=XX))
-        ax.plot(XX[:, i], gam.partial_dependence(term=i, X=XX, width=0.95)[1], c="r", ls="--")
-        if i == 0:
-            ax.set_ylim(-30, 30)
+        
+        partial_dependence, conf_intervals = gam.partial_dependence(term=i, X=XX, width=0.95)
+        
+        min_y, max_y = np.min(conf_intervals), np.max(conf_intervals)
+        range_y = max_y - min_y
+        ax.plot(XX[:, i], partial_dependence, zorder=9)
+        ax.plot(XX[:, i], conf_intervals, c="r", ls="--", zorder=9)
+        
+        # Set up limits
+        ax.set_ylim(min_y - 0.1 * range_y, max_y + 0.1 * range_y)
         ax.set_title(titles[i])
+        ax.grid(True, ls="--", zorder=0, alpha=0.33)
 
     fig.tight_layout()
     plt.savefig(OUTPUT_DIRECTORY / "pygam_wage_data_linear.png", dpi=300)
@@ -151,35 +157,58 @@ def default_data_logistic():
     gam = LogisticGAM(f(0) + s(1) + s(2))
     gam.gridsearch(X, y)
 
-    plt.figure()
-    fig, axs = plt.subplots(1, 3)
+    fig, axs = plt.subplots(1, 3, figsize=(8, 2.5))
+    fig.suptitle("GAM fitted on credit default data", y=0.9, fontsize=12)
 
     titles = ["student", "balance", "income"]
     for i, ax in enumerate(axs):
         XX = gam.generate_X_grid(term=i)
-
-        ax.plot(XX[:, i], gam.partial_dependence(term=i, X=XX))
-        ax.plot(XX[:, i], gam.partial_dependence(term=i, X=XX, width=0.95)[1], c="r", ls="--")
+        
+        partial_dependence, conf_intervals = gam.partial_dependence(term=i, X=XX, width=0.95)
+        
+        min_y, max_y = np.min(conf_intervals), np.max(conf_intervals)
+        range_y = max_y - min_y
+        ax.plot(XX[:, i], partial_dependence, zorder=9)
+        ax.plot(XX[:, i], conf_intervals, c="r", ls="--", zorder=9)
+        
+        # Set up limits
+        ax.set_ylim(min_y - 0.1 * range_y, max_y + 0.1 * range_y)
         ax.set_title(titles[i])
+        ax.grid(True, ls="--", zorder=0, alpha=0.33)
 
     fig.tight_layout()
     plt.savefig(OUTPUT_DIRECTORY / "pygam_default_data_logistic.png", dpi=300)
 
 
 def constraints():
-    X, y = hepatitis(return_X_y=True)
 
-    gam1 = LinearGAM(s(0, constraints="monotonic_inc")).fit(X, y)
-    gam2 = LinearGAM(s(0, constraints="concave")).fit(X, y)
+    rng = np.random.default_rng(42)
+    X = rng.random(size=(100)) * 3 - 1.3
+    X = np.sort(X).reshape(-1, 1)
+    y = np.sin(X * np.pi / 2).ravel() + rng.normal(scale=0.1, size=100)
 
-    fig, ax = plt.subplots(1, 2)
-    ax[0].plot(X, y, label="data")
-    ax[0].plot(X, gam1.predict(X), label="monotonic fit")
-    ax[0].legend()
+    gam1 = LinearGAM(s(0, constraints="none", lam=1)).fit(X, y)
+    gam2 = LinearGAM(s(0, constraints="monotonic_inc", lam=1)).fit(X, y)
+    gam3 = LinearGAM(s(0, constraints="concave", lam=1)).fit(X, y)
 
-    ax[1].plot(X, y, label="data")
-    ax[1].plot(X, gam2.predict(X), label="concave fit")
-    ax[1].legend()
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(8, 3), sharex=True, sharey=True)
+    
+    ax1.set_title("No constraint")
+    ax1.scatter(X, y, color="black", s=10, zorder=5)
+    ax1.plot(X, gam1.predict(X), zorder=9, lw=3)
+    
+    ax2.set_title("Monotonic constraint")
+    ax2.scatter(X, y, color="black", s=10, zorder=5)
+    ax2.plot(X, gam2.predict(X), zorder=9, lw=3)
+
+    ax3.set_title("Concave constraint")
+    ax3.scatter(X, y, color="black", s=10, zorder=5)
+    ax3.plot(X, gam3.predict(X),  zorder=9, lw=3)
+    
+    for ax in (ax1, ax2, ax3):
+        ax.grid(True, ls="--", zorder=0, alpha=0.33)
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
 
     fig.tight_layout()
     plt.savefig(OUTPUT_DIRECTORY / "pygam_constraints.png", dpi=300)
@@ -313,7 +342,8 @@ def expectiles():
     X, y = mcycle(return_X_y=True)
 
     # lets fit the mean model first by CV
-    gam50 = ExpectileGAM(expectile=0.5).gridsearch(X, y)
+    # gam50 = ExpectileGAM(expectile=0.5, lam=1, n_splines=10, fit_intercept=True).fit_quantile(X, y, quantile=0.5)
+    gam50 = ExpectileGAM(expectile=0.5, lam=0.5).fit_quantile(X, y, quantile=0.50)
 
     # and copy the smoothing to the other models
     lam = gam50.lam
@@ -324,7 +354,7 @@ def expectiles():
     gam25 = ExpectileGAM(expectile=0.25, lam=lam).fit(X, y)
     gam05 = ExpectileGAM(expectile=0.05, lam=lam).fit(X, y)
 
-    XX = gam50.generate_X_grid(term=0, n=500)
+    XX = gam50.generate_X_grid(term=0, n=500).reshape(-1, 1)
 
     fig = plt.figure()
     plt.scatter(X, y, c="k", alpha=0.2)
@@ -340,15 +370,16 @@ def expectiles():
 
 
 if __name__ == "__main__":
+    expectiles()
+    1/0
+    chicago_tensor()
+    gen_tensor_data()
+    gen_multi_data()
+    trees_data_custom()
+    mcycle_data_linear()
+    default_data_logistic()
+    constraints()
     gen_basis_fns()
     faithful_data_poisson()
     wage_data_linear()
-    default_data_logistic()
-    constraints()
-    trees_data_custom()
-    mcycle_data_linear()
     # cake_data_in_one()
-    gen_multi_data()
-    gen_tensor_data()
-    chicago_tensor()
-    expectiles()

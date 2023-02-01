@@ -175,14 +175,17 @@ gam.summary()
 # $$
 
 # %%
+15.8489**2
+
+# %%
 from pygam import LinearGAM, s, f
 from pygam.datasets import wage
 
 X, y = wage(return_X_y=True)
 
 ## model
-gam = LinearGAM(s(0) + s(1) + f(2))
-gam.gridsearch(X, y)
+gam = LinearGAM(s(0, lam=10000) + s(1, lam=100000) + f(2, lam=10000)).fit(X, y)
+# gam.gridsearch(X, y)
 
 
 ## plotting
@@ -214,6 +217,7 @@ from pygam.datasets import mcycle
 X, y = mcycle(return_X_y=True)
 
 gam = LinearGAM(n_splines=25).gridsearch(X, y)
+print(gam.lam)
 XX = gam.generate_X_grid(term=0, n=500)
 
 plt.plot(XX, gam.predict(XX), 'r--')
@@ -486,16 +490,15 @@ from pygam.datasets import mcycle
 
 X, y = mcycle()
 
-gam = LinearGAM()
-gam.gridsearch(X, y)
+gam = LinearGAM().fit(X, y)
 
 XX = gam.generate_X_grid(term=0)
 
 m = X.min()
 M = X.max()
-XX = np.linspace(m - 10, M + 10, 500)
-Xl = np.linspace(m - 10, m, 50)
-Xr = np.linspace(M, M + 10, 50)
+XX = np.linspace(m - 10, M + 10, 500)#.reshape(-1, 1)
+Xl = np.linspace(m - 10, m, 50).reshape(-1, 1)
+Xr = np.linspace(M, M + 10, 50).reshape(-1, 1)
 
 plt.figure()
 
