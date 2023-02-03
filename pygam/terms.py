@@ -1445,6 +1445,31 @@ class TensorTerm(SplineTerm, MetaTermMixin):
         Returns
         -------
         C : sparse CSC matrix containing the model constraints in quadratic form
+
+        Examples
+        --------
+        >>> spline1 = s(0, n_splines=3, lam=1)
+        >>> spline2 = s(1, n_splines=4, lam=1, constraints="monotonic_inc")
+        >>> coef = np.array([0, 1, 2, 3, 4, 5, 6, 0, 8, 9, 10, 11])
+        >>> tensor = te(spline1, spline2)
+        >>> spline2.build_constraints(np.array([5, 4, 3, 4]), 1).astype(int)
+        array([[ 0,  0,  0,  0],
+               [-1,  1,  0,  0],
+               [ 0, -1,  1,  0],
+               [ 0,  0,  0,  0]])
+        >>> tensor._build_marginal_constraints(1, -coef, 1).A.astype(int)
+        array([[ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0, -1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0, -1,  1,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0, -1,  1,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0, -1,  1,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0, -1,  1,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0, -1,  1,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1,  1]])
         """
 
         composite_C = sp.sparse.csc_matrix((len(coef), len(coef)))
@@ -1457,7 +1482,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
             slice_C = self._terms[i].build_constraints(coef_slice, constraint_lam)
 
             # now enter it into the composite
-            composite_C[tuple(np.meshgrid(slice_, slice_))] = slice_C
+            composite_C[tuple(np.meshgrid(slice_, slice_))] = slice_C.T
 
         return sp.sparse.csc_matrix(composite_C)
 

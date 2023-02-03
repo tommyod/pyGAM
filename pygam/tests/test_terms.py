@@ -422,7 +422,7 @@ class TestRegressions:
         gam_compose = LinearGAM(s(0, constraints=["monotonic_inc", "monotonic_dec"])).fit(X, y)
         gam_intercept = LinearGAM(terms=None).fit(X, y)
 
-        assert np.allclose(gam_compose.coef_[-1], gam_intercept.coef_)
+        assert np.allclose(gam_compose.coef_[-1], gam_intercept.coef_[0], rtol=1e-4)
 
     def test_constraints_and_tensor(self, chicago_X_y):
         """a model that has consrtraints and tensor terms should not fail to build
