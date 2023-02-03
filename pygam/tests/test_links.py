@@ -13,21 +13,18 @@ LINKS_AND_LEVELS = list(itertools.product(LINKS.values(), [1, 2, 3, 4, 5]))
 class TestLink:
     @pytest.mark.parametrize("link,levels", LINKS_AND_LEVELS)
     def test_that_links_are_inverses_link_mu(self, link, levels):
-
         argument = np.random.rand(100)
         dist = BinomialDist(levels=levels)
         assert np.allclose(link().mu(link().link(argument, dist), dist), argument)
 
     @pytest.mark.parametrize("link, levels", LINKS_AND_LEVELS)
     def test_that_links_are_inverses_mu_link(self, link, levels):
-
         argument = np.random.rand(100)
         dist = BinomialDist(levels=levels)
         assert np.allclose(link().link(link().mu(argument, dist), dist), argument)
 
     @pytest.mark.parametrize("link, levels", LINKS_AND_LEVELS)
     def test_that_links_derivatives_are_close_to_finite_differences(self, link, levels):
-
         rng = np.random.default_rng(42)
         argument = 0.01 + rng.random(100) * 0.98
         dist = BinomialDist(levels=levels)

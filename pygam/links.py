@@ -47,7 +47,6 @@ class Link(Core, metaclass=ABCMeta):
 
 
 class IdentityLink(Link):
-
     name = "identity"
     domain = (-np.inf, np.inf)
 
@@ -62,12 +61,10 @@ class IdentityLink(Link):
 
 
 class LogitLink(Link):
-
     name = "logit"
     domain = (-np.inf, np.inf)
 
     def link(self, mu, dist):
-        # logit(p) = log(p / (1 - p))
         return np.log(mu) - np.log(dist.levels - mu)
 
     def mu(self, lp, dist):
@@ -79,7 +76,6 @@ class LogitLink(Link):
 
 
 class CLogLogLink(Link):
-
     name = "cloglog"
 
     def link(self, mu, dist):
@@ -106,7 +102,6 @@ class LogLink(Link):
 
 
 class InverseLink(Link):
-
     name = "inverse"
 
     def link(self, mu, dist):
@@ -120,7 +115,6 @@ class InverseLink(Link):
 
 
 class InvSquaredLink(Link):
-
     name = "inv_squared"
 
     def link(self, mu, dist):

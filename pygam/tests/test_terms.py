@@ -140,7 +140,6 @@ def test_term_list_only_accepts_terms_or_term_list():
 
 
 def test_that_all_terms_return_array_for_constraints_and_penalties():
-
     term = SplineTerm(0, n_splines=8)
     penalty = term.build_penalties()
     assert isinstance(penalty, np.ndarray)
@@ -371,7 +370,6 @@ class TestTensorTerm:
 
     @pytest.mark.parametrize("n_splines", [[2, 4, 3, 6], [2, 3, 4], [7, 4]])
     def test_that_creation_methods_are_equal_arbitrary_dimension(self, n_splines):
-
         # Build up using args directly in te()
         tensor_features = tuple(range(len(n_splines)))
         tensor1 = te(*tensor_features, n_splines=n_splines)
@@ -470,7 +468,6 @@ if __name__ == "__main__":
     )
 
     if False:
-
         # This dataset only has one feature
         from pygam.datasets import hepatitis
 

@@ -226,7 +226,6 @@ def test_gridsearch_works_on_Series_REGRESSION():
 
 
 if __name__ == "__main__":
-
     pytest.main(
         args=[__file__, "-v", "--capture=sys", "--doctest-modules", "-k test_GCV_objective_is_for_unknown_scale"]
     )

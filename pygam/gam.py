@@ -144,7 +144,6 @@ class GAM(Core, MetaTermMixin):
         verbose=False,
         **kwargs,
     ):
-
         self.max_iter = max_iter
         self.tol = tol
         self.distribution = distribution
@@ -1421,7 +1420,6 @@ class GAM(Core, MetaTermMixin):
         data = []
 
         for i, term in enumerate(self.terms):
-
             # TODO bug: if the number of samples is less than the number of coefficients
             # we cant get the edof per term
             if len(self.statistics_["edof_per_coef"]) == len(self.coef_):
@@ -1624,7 +1622,6 @@ class GAM(Core, MetaTermMixin):
         grids = []
 
         for param, grid in list(param_grids.items()):
-
             # check param exists
             if param not in (admissible_params):
                 raise ValueError("unknown parameter: {}".format(param))
@@ -1639,7 +1636,6 @@ class GAM(Core, MetaTermMixin):
 
             # prepare grid
             if any(isiterable(g) for g in grid):
-
                 # get required parameter shape
                 target_len = len(flatten(getattr(self, param)))
 
@@ -1685,7 +1681,6 @@ class GAM(Core, MetaTermMixin):
 
         # loop through candidate model params
         for grid in product(*grids):
-
             # build dict of candidate model params
             param_grid = dict(zip(params, grid))
 
@@ -2203,7 +2198,6 @@ class LogisticGAM(GAM):
         verbose=False,
         **kwargs,
     ):
-
         # call super
         super().__init__(
             terms=terms,
@@ -2388,7 +2382,6 @@ class PoissonGAM(GAM):
         verbose=False,
         **kwargs,
     ):
-
         # call super
         super().__init__(
             terms=terms,
@@ -3151,7 +3144,6 @@ if __name__ == "__main__":
     pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules"])
 
     if False:
-
         rng = np.random.default_rng(21)
         X = rng.normal(size=(1000, 3))
         y = 5 + np.array([np.sin(X[:, i] * 1 * (i + 1)) for i in range(X.shape[1])]).sum(axis=0)

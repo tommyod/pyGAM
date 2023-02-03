@@ -132,7 +132,6 @@ def check_X(X, n_feats=None, min_samples=1, edge_knots=None, dtypes=None, featur
 
     # check our categorical data has no new categories
     if (edge_knots is not None) and (dtypes is not None) and (features is not None):
-
         # get a flattened list of tuples
         edge_knots = flatten(edge_knots)[::-1]
         dtypes = flatten(dtypes)

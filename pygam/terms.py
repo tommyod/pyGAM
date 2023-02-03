@@ -343,7 +343,6 @@ class Term(Core, metaclass=ABCMeta):
 
         penalty_matrices = []
         for penalty, lam in zip(self.penalties, self.lam):
-
             if penalty == "auto":
                 penalty = self._determine_auto()
             elif penalty is None:
@@ -396,7 +395,6 @@ class Term(Core, metaclass=ABCMeta):
 
         constraint_matrices = []
         for constraint in self.constraints:
-
             if constraint is None:
                 constraint = "none"
             if constraint in CONSTRAINTS:
@@ -1042,7 +1040,6 @@ class MetaTermMixin:
 
             # now set each term's sequence of arguments
             for term in self._get_terms()[::-1]:
-
                 # skip intercept
                 if term.isintercept:
                     continue
@@ -1061,11 +1058,9 @@ class MetaTermMixin:
 
     def __getattr__(self, name):
         if self._has_terms() and name in self._super_get("_plural"):
-
             # collect value from each term
             values = []
             for term in self._get_terms():
-
                 # skip the intercept
                 if term.isintercept:
                     continue
