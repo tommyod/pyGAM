@@ -370,8 +370,8 @@ def expectiles():
 
 
 if __name__ == "__main__":
+    wage_data_linear()
     expectiles()
-    1/0
     chicago_tensor()
     gen_tensor_data()
     gen_multi_data()
@@ -381,5 +381,4 @@ if __name__ == "__main__":
     constraints()
     gen_basis_fns()
     faithful_data_poisson()
-    wage_data_linear()
     # cake_data_in_one()

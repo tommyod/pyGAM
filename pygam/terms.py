@@ -334,7 +334,9 @@ class Term(Core, metaclass=ABCMeta):
         -------
         P : sparse CSC matrix containing the model penalties in quadratic form
         """
+
         logger.debug(f"Building penalty matrix for term: {self.get_params()}")
+        logger.debug(f"Number of coefficients in term: {self.n_coefs}")
 
         if self.isintercept:
             return np.array([[0.0]])
@@ -364,9 +366,9 @@ class Term(Core, metaclass=ABCMeta):
             penalty_matrices.append(penalty_matrix)
 
         # Sum to a single (n_coefs, n_coefs) matrix
-        penalty_matrix = np.sum(penalty_matrices, axis=0)
+        penalty_matrix = functools.reduce(np.add, penalty_matrices)
         assert isinstance(penalty_matrix, np.ndarray)
-        # assert penalty_matrix.shape == (self.n_coefs, self.n_coefs)
+        assert penalty_matrix.shape == (self.n_coefs, self.n_coefs)
         return penalty_matrix
 
     def build_constraints(self, coef, constraint_lam):

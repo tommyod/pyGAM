@@ -240,13 +240,32 @@ def check_param(param, param_name, dtype, constraint=None, iterable=True, max_de
 def load_diagonal(cov, load=None):
     """Return the given square matrix with a small amount added to the diagonal
     to make it positive semi-definite.
+
+    Examples
+    --------
+    >>> A = np.arange(9).reshape(3, 3)
+    >>> A
+    array([[0, 1, 2],
+           [3, 4, 5],
+           [6, 7, 8]])
+    >>> load_diagonal(A, 10)
+    array([[10,  1,  2],
+           [ 3, 14,  5],
+           [ 6,  7, 18]])
     """
+
     n, m = cov.shape
-    assert n == m, "matrix must be square, but found shape {}".format((n, m))
+    assert n == m, f"matrix must be square, but found shape {cov.shape}"
+    cov = cov.copy()
 
     if load is None:
-        load = np.sqrt(np.finfo(np.float64).eps)  # machine epsilon
-    return cov + np.eye(n) * load
+        machine_epsilon = np.finfo(float).eps  # 2.220446049250313e-16
+        load = np.sqrt(machine_epsilon)
+
+    # Idea from : https://github.com/scikit-learn/scikit-learn/blob/f9637ee0ae118d73834d240c09d683f692918911/sklearn/linear_model/_ridge.py#L215
+    # Copying a (999, 999) matrix takes 423 µs, adding np.eye(999) takes 1.56 ms
+    cov.flat[:: n + 1] += load
+    return cov
 
 
 def round_to_n_decimal_places(array, n=3):

@@ -291,38 +291,43 @@ def test_tensor_terms_have_constraints(toy_interaction_X_y):
     even if those constraints are 'none'
     """
     X, y = toy_interaction_X_y
-    gam = LinearGAM(te(0, 1, constraints="none")).fit(X, y)
+    gam = LinearGAM(te(0, 1, constraints="none")).fit(X[:100, :], y[:100])
 
     assert gam._is_fitted
     assert gam.terms.hasconstraint
 
 
-def test_tensor_composite_constraints_equal_penalties():
-    """check that the composite constraint matrix for a tensor term
-    is equivalent to a penalty matrix under the correct conditions
-    """
+def test_tensor_constraints():
+    term = te(0, 1, n_splines=[3, 4], penalties="auto", lam=1, constraints="monotonic_inc")
+    coefs = np.array([11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
+    # The coefficient matrix would look like
+    # array([[11, 10,  9,  8],
+    #        [ 7,  6,  5,  4],
+    #        [ 3,  2,  1,  0]])
+    # and from the point of view of marginal 0 (each column)
+    # penalties are imposed on every entry apart from the first row
+    # for instance, element 7 corresponds to row 5 below and the penalty
+    # is (element with number 7) - (element with number 11)
 
-    from pygam.penalties import derivative
+    C = term._build_marginal_constraints(0, coefs, constraint_lam=1).astype(int)
+    ans = np.array(
+        [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [-1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+            [0, -1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+            [0, 0, -1, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+            [0, 0, 0, -1, 0, 0, 0, 1, 0, 0, 0, 0],
+            [0, 0, 0, 0, -1, 0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 0, 0, -1, 0, 0, 0, 1, 0, 0],
+            [0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 1],
+        ]
+    )
 
-    def der1(*args, **kwargs):
-        print(args, kwargs)
-        return derivative(*args, **kwargs)
-
-    # create a 3D tensor where the penalty should be equal to the constraint
-    term = te(0, 1, n_splines=[4, 5], penalties=der1, lam=1, constraints="monotonic_inc")
-
-    # check all the dimensions
-    for i in range(3):
-        P = term._build_marginal_penalties(i).A
-        C = term._build_marginal_constraints(i, -np.arange(term.n_coefs), constraint_lam=1).A
-        P = P @ P.T
-
-        print(P)
-        print(P.shape)
-        print(C)
-        print(C.shape)
-
-        assert np.all(P == C)
+    assert np.allclose(C, ans)
 
 
 def test_tensor_with_constraints(hepatitis_X_y):
@@ -460,7 +465,7 @@ if __name__ == "__main__":
             "-v",
             "--capture=sys",
             "--doctest-modules",
-            "-k test_tensor_composite_constraints_equal_penalties",
+            "-k test_tensor_constraints",
         ]
     )
 

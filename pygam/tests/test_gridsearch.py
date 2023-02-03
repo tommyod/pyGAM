@@ -223,3 +223,10 @@ def test_gridsearch_works_on_Series_REGRESSION():
     # Series
     gam = LinearGAM().gridsearch(X[[0]], y)
     assert gam._is_fitted
+
+
+if __name__ == "__main__":
+
+    pytest.main(
+        args=[__file__, "-v", "--capture=sys", "--doctest-modules", "-k test_GCV_objective_is_for_unknown_scale"]
+    )
