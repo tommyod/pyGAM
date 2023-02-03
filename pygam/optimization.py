@@ -153,7 +153,7 @@ class BetaOptimizer:
 
             # If deviance decreased, decrease the step size
             if len(gam.logs_["deviance"]) > 2 and gam.logs_["deviance"][-1] > gam.logs_["deviance"][-2]:
-                step_size = step_size * 0.99
+                step_size = step_size * 0.95
                 logger.info(f"Deviance increased, setting step size: {step_size:.4f}")
 
             # log on-loop-end stats

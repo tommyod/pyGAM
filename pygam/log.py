@@ -15,6 +15,7 @@ def setup_custom_logger(name):
     logger = logging.getLogger(name)
 
     # https://docs.python.org/3/library/logging.html#levels
+    # DEBUG, NOTSET
     logger.setLevel(logging.DEBUG)
 
     if not logger.hasHandlers():

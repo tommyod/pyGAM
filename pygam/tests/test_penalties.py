@@ -34,7 +34,6 @@ class TestContraints:
         "constraint,length", itertools.product([convex, concave, monotonic_inc, monotonic_dec], list(range(3, 31)))
     )
     def test_constraint_as_optimization_problem(self, constraint, length):
-
         rng = np.random.default_rng(1)
         a = rng.normal(size=length)
 
@@ -42,7 +41,6 @@ class TestContraints:
         num_iterations = 0
         error_vec = constraint(a) @ a
         while error_vec.dot(error_vec) > 1e-18:
-
             # Move to minimize error
             step = 1.1
             a = a - step * error_vec
@@ -154,7 +152,6 @@ if __name__ == "__main__":
         X, y = hepatitis(True)
 
         for max_iter in range(2, 99):
-
             # This dataset only has one feature
 
             X, y = hepatitis(True)

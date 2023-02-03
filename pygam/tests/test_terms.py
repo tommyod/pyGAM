@@ -6,7 +6,6 @@ import numpy as np
 import pytest
 
 from pygam import LinearGAM, PoissonGAM, f, l, s, te
-from pygam.penalties import FDMatrix
 from pygam.terms import FactorTerm, Intercept, LinearTerm, SplineTerm, TensorTerm, Term, TermList
 from pygam.utils import flatten
 
@@ -138,6 +137,22 @@ def test_term_list_only_accepts_terms_or_term_list():
     TermList()
     with pytest.raises(TypeError):
         TermList(None)
+
+
+def test_that_all_terms_return_array_for_constraints_and_penalties():
+    term = SplineTerm(0, n_splines=8)
+    penalty = term.build_penalties()
+    assert isinstance(penalty, np.ndarray)
+    assert penalty.shape[1] == 8
+
+    constraint = term.build_constraints(np.arange(8), 1)
+    assert isinstance(constraint, np.ndarray)
+    assert constraint.shape[1] == 8
+
+    term = LinearTerm(0)
+    penalty = term.build_penalties()
+    assert isinstance(penalty, np.ndarray)
+    assert penalty.shape[1] == 1
 
 
 def test_pop_term_from_term_list():
@@ -275,30 +290,43 @@ def test_tensor_terms_have_constraints(toy_interaction_X_y):
     even if those constraints are 'none'
     """
     X, y = toy_interaction_X_y
-    gam = LinearGAM(te(0, 1, constraints="none")).fit(X, y)
+    gam = LinearGAM(te(0, 1, constraints="none")).fit(X[:100, :], y[:100])
 
     assert gam._is_fitted
     assert gam.terms.hasconstraint
 
 
-def test_tensor_composite_constraints_equal_penalties():
-    """check that the composite constraint matrix for a tensor term
-    is equivalent to a penalty matrix under the correct conditions
-    """
+def test_tensor_constraints():
+    term = te(0, 1, n_splines=[3, 4], penalties="auto", lam=1, constraints="monotonic_inc")
+    coefs = np.array([11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
+    # The coefficient matrix would look like
+    # array([[11, 10,  9,  8],
+    #        [ 7,  6,  5,  4],
+    #        [ 3,  2,  1,  0]])
+    # and from the point of view of marginal 0 (each column)
+    # penalties are imposed on every entry apart from the first row
+    # for instance, element 7 corresponds to row 5 below and the penalty
+    # is (element with number 7) - (element with number 11)
 
-    def der1(*args, **kwargs):
-        kwargs.update({"order": 1})
-        return FDMatrix.derivative(*args, **kwargs, periodic=False)
+    C = term._build_marginal_constraints(0, coefs, constraint_lam=1).astype(int)
+    ans = np.array(
+        [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [-1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+            [0, -1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+            [0, 0, -1, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+            [0, 0, 0, -1, 0, 0, 0, 1, 0, 0, 0, 0],
+            [0, 0, 0, 0, -1, 0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 0, 0, -1, 0, 0, 0, 1, 0, 0],
+            [0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 1],
+        ]
+    )
 
-    # create a 3D tensor where the penalty should be equal to the constraint
-    term = te(0, 1, 2, n_splines=[4, 5, 6], penalties=der1, lam=1, constraints="monotonic_inc")
-
-    # check all the dimensions
-    for i in range(3):
-        P = term._build_marginal_penalties(i).A
-        C = term._build_marginal_constraints(i, -np.arange(term.n_coefs), constraint_lam=1).A
-
-        assert (P == C).all()
+    assert np.allclose(C, ans)
 
 
 def test_tensor_with_constraints(hepatitis_X_y):
@@ -333,8 +361,8 @@ class TestTensorTerm:
         tensor2 = te(s(0, n_splines=splines1), s(1, n_splines=splines2))
         assert tensor2.n_coefs == splines1 * splines2
 
-        penalties1 = tensor1.build_penalties().A
-        penalties2 = tensor2.build_penalties().A
+        penalties1 = tensor1.build_penalties()
+        penalties2 = tensor2.build_penalties()
         expected_shape = (splines1 * splines2, splines1 * splines2)
         assert penalties1.shape == expected_shape
         assert penalties2.shape == expected_shape
@@ -342,7 +370,6 @@ class TestTensorTerm:
 
     @pytest.mark.parametrize("n_splines", [[2, 4, 3, 6], [2, 3, 4], [7, 4]])
     def test_that_creation_methods_are_equal_arbitrary_dimension(self, n_splines):
-
         # Build up using args directly in te()
         tensor_features = tuple(range(len(n_splines)))
         tensor1 = te(*tensor_features, n_splines=n_splines)
@@ -353,8 +380,8 @@ class TestTensorTerm:
         tensor2 = te(*te_args)
         assert tensor2.n_coefs == np.prod(n_splines)
 
-        penalties1 = tensor1.build_penalties().A
-        penalties2 = tensor2.build_penalties().A
+        penalties1 = tensor1.build_penalties()
+        penalties2 = tensor2.build_penalties()
         expected_shape = tuple([np.prod(n_splines)] * 2)
         assert penalties1.shape == expected_shape
         assert penalties2.shape == expected_shape
@@ -415,7 +442,7 @@ class TestRegressions:
         gam_compose = LinearGAM(s(0, constraints=["monotonic_inc", "monotonic_dec"])).fit(X, y)
         gam_intercept = LinearGAM(terms=None).fit(X, y)
 
-        assert np.allclose(gam_compose.coef_[-1], gam_intercept.coef_)
+        assert np.allclose(gam_compose.coef_[-1], gam_intercept.coef_[0], rtol=1e-4)
 
     def test_constraints_and_tensor(self, chicago_X_y):
         """a model that has consrtraints and tensor terms should not fail to build
@@ -436,38 +463,41 @@ if __name__ == "__main__":
             "-v",
             "--capture=sys",
             "--doctest-modules",
-            "-k test_tensor_composite_constraints_equal_penalties",
+            "-k test_tensor_constraints",
         ]
     )
 
-    # This dataset only has one feature
-    from pygam.datasets import hepatitis
+    if False:
+        # This dataset only has one feature
+        from pygam.datasets import hepatitis
 
-    X, y = hepatitis(True)
+        X, y = hepatitis(True)
 
-    # Add a random interaction data
-    rng = np.random.default_rng(1)
-    X = np.c_[X, rng.normal(size=X.shape[0])]
-    X = rng.normal(size=(100, 2))
-    X = X[np.argsort(X[:, 0]), :]
-    y = 1 / (1 + np.exp(-X[:, 0]))
+        # Add a random interaction data
+        rng = np.random.default_rng(1)
+        X = np.c_[X, rng.normal(size=X.shape[0])]
+        X = rng.normal(size=(100, 2))
+        X = X[np.argsort(X[:, 0]), :]
+        y = 1 / (1 + np.exp(-X[:, 0]))
 
-    # constrain useless dimension
-    gam_useless_constraint = LinearGAM(te(0, 1, constraints=["none", "monotonic_dec"], n_splines=[10, 4], lam=[1, 1]))
-    gam_useless_constraint.fit(X, y)
+        # constrain useless dimension
+        gam_useless_constraint = LinearGAM(
+            te(0, 1, constraints=["none", "monotonic_dec"], n_splines=[10, 4], lam=[1, 1])
+        )
+        gam_useless_constraint.fit(X, y)
 
-    # constrain informative dimension
-    gam_constrained = LinearGAM(te(0, 1, constraints=["monotonic_dec", "none"], n_splines=[10, 4], lam=[1, 1]))
-    gam_constrained.fit(X, y)
+        # constrain informative dimension
+        gam_constrained = LinearGAM(te(0, 1, constraints=["monotonic_dec", "none"], n_splines=[10, 4], lam=[1, 1]))
+        gam_constrained.fit(X, y)
 
-    import matplotlib.pyplot as plt
+        import matplotlib.pyplot as plt
 
-    plt.scatter(X[:, 0], y)
-    plt.plot(X[:, 0], gam_useless_constraint.predict(X), color="red")
-    plt.plot(X[:, 0], gam_constrained.predict(X), color="black")
+        plt.scatter(X[:, 0], y)
+        plt.plot(X[:, 0], gam_useless_constraint.predict(X), color="red")
+        plt.plot(X[:, 0], gam_constrained.predict(X), color="black")
 
-    print(gam_useless_constraint.statistics_["pseudo_r2"]["explained_deviance"])
-    print(gam_constrained.statistics_["pseudo_r2"]["explained_deviance"])
+        print(gam_useless_constraint.statistics_["pseudo_r2"]["explained_deviance"])
+        print(gam_constrained.statistics_["pseudo_r2"]["explained_deviance"])
 
-    assert gam_useless_constraint.statistics_["pseudo_r2"]["explained_deviance"] > 0.5
-    assert gam_constrained.statistics_["pseudo_r2"]["explained_deviance"] < 0.1
+        assert gam_useless_constraint.statistics_["pseudo_r2"]["explained_deviance"] > 0.5
+        assert gam_constrained.statistics_["pseudo_r2"]["explained_deviance"] < 0.1

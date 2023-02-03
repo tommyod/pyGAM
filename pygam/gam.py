@@ -10,40 +10,26 @@ import pandas as pd
 import scipy as sp
 from sklearn.utils import check_array, check_X_y
 
-from pygam.callbacks import CALLBACKS, Accuracy, CallBack, Coef, Deviance, Diffs, validate_callback
+from pygam.callbacks import CALLBACKS, CallBack, validate_callback
 from pygam.core import Core
 from pygam.distributions import (
     DISTRIBUTIONS,
-    BinomialDist,
     Distribution,
     GammaDist,
     InvGaussDist,
     NormalDist,
-    PoissonDist,
 )
-from pygam.links import LINKS, IdentityLink, InverseLink, InvSquaredLink, Link, LogitLink, LogLink
+from pygam.links import LINKS, Link
 from pygam.optimization import BetaOptimizer
-from pygam.penalties import CONSTRAINTS, PENALTIES, concave, convex, derivative, l2, monotonic_dec, monotonic_inc
 from pygam.terms import (
-    FactorTerm,
     Intercept,
-    LinearTerm,
     MetaTermMixin,
     SplineTerm,
-    TensorTerm,
     Term,
     TermList,
-    f,
-    intercept,
-    l,
-    s,
-    te,
 )
 from pygam.utils import (
-    NotPositiveDefiniteError,
-    OptimizationError,
     TablePrinter,
-    b_spline_basis,
     check_lengths,
     check_param,
     check_X,
@@ -55,65 +41,6 @@ from pygam.utils import (
     sig_code,
     space_row,
 )
-
-__all__ = [
-    "derivative",
-    "l2",
-    "monotonic_inc",
-    "monotonic_dec",
-    "convex",
-    "concave",
-    "PENALTIES",
-    "CONSTRAINTS",
-    "Distribution",
-    "NormalDist",
-    "BinomialDist",
-    "PoissonDist",
-    "GammaDist",
-    "InvGaussDist",
-    "DISTRIBUTIONS",
-    "Link",
-    "IdentityLink",
-    "LogitLink",
-    "LogLink",
-    "InverseLink",
-    "InvSquaredLink",
-    "LINKS",
-    "CallBack",
-    "Deviance",
-    "Diffs",
-    "Accuracy",
-    "Coef",
-    "validate_callback",
-    "CALLBACKS",
-    "check_y",
-    "check_X",
-    "make_2d",
-    "flatten",
-    "check_lengths",
-    "load_diagonal",
-    "TablePrinter",
-    "space_row",
-    "sig_code",
-    "b_spline_basis",
-    "check_param",
-    "isiterable",
-    "NotPositiveDefiniteError",
-    "OptimizationError",
-    "Term",
-    "Intercept",
-    "intercept",
-    "LinearTerm",
-    "l",
-    "SplineTerm",
-    "s",
-    "FactorTerm",
-    "f",
-    "TensorTerm",
-    "te",
-    "TermList",
-    "MetaTermMixin",
-]
 
 
 EPS = np.finfo(np.float64).eps  # machine epsilon
@@ -135,12 +62,7 @@ class GAM(Core, MetaTermMixin):
     terms : expression specifying terms to model, optional.
 
         By default a univariate spline term will be allocated for each feature.
-
-        For example:
-
-        >>> GAM(s(0) + l(1) + f(2) + te(3, 4))
-
-        will fit a spline term on feature 0, a linear term on feature 1,
+        Will fit a spline term on feature 0, a linear term on feature 1,
         a factor term on feature 2, and a tensor term on features 3 and 4.
 
     callbacks : list of str or list of CallBack objects, optional
@@ -182,6 +104,20 @@ class GAM(Core, MetaTermMixin):
 
         The logs are structured as ``{callback: [...]}``
 
+    Examples
+    --------
+    >>> from pygam import GAM, s, l, f, te
+    >>> from pygam.datasets import wage
+    >>> X, y = wage(return_X_y=True)
+    >>> # The features are: 'year', 'age', 'education'
+    >>> gam = GAM(l(0) + s(1) + f(2), link="identity", distribution="normal")
+    >>> gam = gam.fit(X, y)
+    >>> gam.predict(X)
+    array([ 52.68627245,  99.57814217, 113.04814967, ...,  71.25893898,
+            94.71905301, 105.0052182 ])
+    >>> gam.score(X, y)
+    0.294...
+
     References
     ----------
     Simon N. Wood, 2006
@@ -208,7 +144,6 @@ class GAM(Core, MetaTermMixin):
         verbose=False,
         **kwargs,
     ):
-
         self.max_iter = max_iter
         self.tol = tol
         self.distribution = distribution
@@ -601,7 +536,7 @@ class GAM(Core, MetaTermMixin):
         # Solve ||X \beta - y||^2_W, where W is a diagonal loading matrix
         # This is the Ridge problem, and sklearn solves it like this:
         # https://github.com/scikit-learn/scikit-learn/blob/4db04923a754b6a2defa1b172f55d492b85d165e/sklearn/linear_model/_ridge.py#L204
-        lhs = load_diagonal(modelmat.T.dot(modelmat).A)
+        lhs = load_diagonal(modelmat.T.dot(modelmat).A, load=1e-4)
         rhs = modelmat.T.dot(y_)
         ans = sp.linalg.solve(lhs, rhs, assume_a="sym")
         return ans.ravel()
@@ -1210,6 +1145,8 @@ class GAM(Core, MetaTermMixin):
 
         Examples
         --------
+        >>> import numpy as np
+        >>> from pygam import LinearGAM, s, te
         >>> x = [np.linspace(0, i, num=2) for i in range(1, 4)]
         >>> X = np.vstack(x).T
         >>> y = X @ np.array([1, 2, 3])
@@ -1483,7 +1420,6 @@ class GAM(Core, MetaTermMixin):
         data = []
 
         for i, term in enumerate(self.terms):
-
             # TODO bug: if the number of samples is less than the number of coefficients
             # we cant get the edof per term
             if len(self.statistics_["edof_per_coef"]) == len(self.coef_):
@@ -1547,12 +1483,7 @@ class GAM(Core, MetaTermMixin):
         Warnings
         --------
         ``gridsearch`` is lazy and will not remove useless combinations
-        from the search space, eg.
-
-        >>> n_splines=np.arange(5,10), fit_splines=[True, False]
-
-        will result in 10 loops, of which 5 are equivalent because
-        ``fit_splines = False``
+        from the search space.
 
         Also, it is not recommended to search over a grid that alternates
         between known scales and unknown scales, as the scores of the
@@ -1617,28 +1548,28 @@ class GAM(Core, MetaTermMixin):
         1. via cartesian product by specifying the grid as a list.
         our grid search will consider ``11 ** 4`` points:
 
-        >>> lam = np.logspace(-3, 3, 11)
-        >>> lams = [lam] * 4
-        >>> gam.gridsearch(X, y, lam=lams)
+        > lam = np.logspace(-3, 3, 11)
+        > lams = [lam] * 4
+        > gam.gridsearch(X, y, lam=lams)
 
         2. directly by specifying the grid as a np.ndarray.
         This is useful for when the dimensionality of the search space
         is very large, and we would prefer to execute a randomized search:
 
-        >>> lams = np.exp(np.random.random(50, 4) * 6 - 3)
-        >>> gam.gridsearch(X, y, lam=lams)
+        > lams = np.exp(np.random.random(50, 4) * 6 - 3)
+        > gam.gridsearch(X, y, lam=lams)
 
         3. copying grids for parameters with multiple dimensions.
         if we specify a 1D np.ndarray for lam, we are implicitly testing the
         space where all points have the same value
 
-        >>> gam.gridsearch(lam=np.logspace(-3, 3, 11))
+        > gam.gridsearch(lam=np.logspace(-3, 3, 11))
 
         is equivalent to:
 
-        >>> lam = np.logspace(-3, 3, 11)
-        >>> lams = np.array([lam] * 4)
-        >>> gam.gridsearch(X, y, lam=lams)
+        > lam = np.logspace(-3, 3, 11)
+        > lams = np.array([lam] * 4)
+        > gam.gridsearch(X, y, lam=lams)
         """
         # special checks if model not fitted
         if not self._is_fitted:
@@ -1691,7 +1622,6 @@ class GAM(Core, MetaTermMixin):
         grids = []
 
         for param, grid in list(param_grids.items()):
-
             # check param exists
             if param not in (admissible_params):
                 raise ValueError("unknown parameter: {}".format(param))
@@ -1706,7 +1636,6 @@ class GAM(Core, MetaTermMixin):
 
             # prepare grid
             if any(isiterable(g) for g in grid):
-
                 # get required parameter shape
                 target_len = len(flatten(getattr(self, param)))
 
@@ -1752,7 +1681,6 @@ class GAM(Core, MetaTermMixin):
 
         # loop through candidate model params
         for grid in product(*grids):
-
             # build dict of candidate model params
             param_grid = dict(zip(params, grid))
 
@@ -2068,7 +1996,7 @@ class LinearGAM(GAM):
 
         For example:
 
-        >>> GAM(s(0) + l(1) + f(2) + te(3, 4))
+        > GAM(s(0) + l(1) + f(2) + te(3, 4))
 
         will fit a spline term on feature 0, a linear term on feature 1,
         a factor term on feature 2, and a tensor term on features 3 and 4.
@@ -2208,7 +2136,7 @@ class LogisticGAM(GAM):
 
         For example:
 
-        >>> GAM(s(0) + l(1) + f(2) + te(3, 4))
+        > GAM(s(0) + l(1) + f(2) + te(3, 4))
 
         will fit a spline term on feature 0, a linear term on feature 1,
         a factor term on feature 2, and a tensor term on features 3 and 4.
@@ -2270,7 +2198,6 @@ class LogisticGAM(GAM):
         verbose=False,
         **kwargs,
     ):
-
         # call super
         super().__init__(
             terms=terms,
@@ -2393,7 +2320,7 @@ class PoissonGAM(GAM):
 
         For example:
 
-        >>> GAM(s(0) + l(1) + f(2) + te(3, 4))
+        > GAM(s(0) + l(1) + f(2) + te(3, 4))
 
         will fit a spline term on feature 0, a linear term on feature 1,
         a factor term on feature 2, and a tensor term on features 3 and 4.
@@ -2455,7 +2382,6 @@ class PoissonGAM(GAM):
         verbose=False,
         **kwargs,
     ):
-
         # call super
         super().__init__(
             terms=terms,
@@ -2662,8 +2588,8 @@ class PoissonGAM(GAM):
         gridsearch method is lazy and will not remove useless combinations
         from the search space, eg.
 
-        >>> n_splines=np.arange(5,10)
-        >>> fit_splines=[True, False]
+        > n_splines=np.arange(5,10)
+        > fit_splines=[True, False]
 
         will result in 10 loops, of which 5 are equivalent because
         even though fit_splines==False
@@ -2752,7 +2678,7 @@ class GammaGAM(GAM):
 
         For example:
 
-        >>> GAM(s(0) + l(1) + f(2) + te(3, 4))
+        > GAM(s(0) + l(1) + f(2) + te(3, 4))
 
         will fit a spline term on feature 0, a linear term on feature 1,
         a factor term on feature 2, and a tensor term on features 3 and 4.
@@ -2871,7 +2797,7 @@ class InvGaussGAM(GAM):
 
         For example:
 
-        >>> GAM(s(0) + l(1) + f(2) + te(3, 4))
+        > GAM(s(0) + l(1) + f(2) + te(3, 4))
 
         will fit a spline term on feature 0, a linear term on feature 1,
         a factor term on feature 2, and a tensor term on features 3 and 4.
@@ -2983,7 +2909,7 @@ class ExpectileGAM(GAM):
 
         For example:
 
-        >>> GAM(s(0) + l(1) + f(2) + te(3, 4))
+        > GAM(s(0) + l(1) + f(2) + te(3, 4))
 
         will fit a spline term on feature 0, a linear term on feature 1,
         a factor term on feature 2, and a tensor term on features 3 and 4.
@@ -3215,62 +3141,63 @@ class ExpectileGAM(GAM):
 if __name__ == "__main__":
     import pytest
 
-    pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules", "-k generate_X_grid"])
+    pytest.main(args=[__file__, "-v", "--capture=sys", "--doctest-modules"])
 
-    rng = np.random.default_rng(21)
-    X = rng.normal(size=(1000, 3))
-    y = 5 + np.array([np.sin(X[:, i] * 1 * (i + 1)) for i in range(X.shape[1])]).sum(axis=0)
-    y = y + rng.normal(size=(X.shape[0]), scale=0.1)
+    if False:
+        rng = np.random.default_rng(21)
+        X = rng.normal(size=(1000, 3))
+        y = 5 + np.array([np.sin(X[:, i] * 1 * (i + 1)) for i in range(X.shape[1])]).sum(axis=0)
+        y = y + rng.normal(size=(X.shape[0]), scale=0.1)
 
-    from sklearn.model_selection import train_test_split
-    import matplotlib.pyplot as plt
+        from sklearn.model_selection import train_test_split
+        import matplotlib.pyplot as plt
 
-    for i in range(X.shape[1]):
-        X_sorted = X[np.argsort(X[:, i]), :]
-        y_sorted = y[np.argsort(X[:, i])]
+        for i in range(X.shape[1]):
+            X_sorted = X[np.argsort(X[:, i]), :]
+            y_sorted = y[np.argsort(X[:, i])]
 
-        plt.plot(X_sorted[:, i], y_sorted)
-        plt.show()
+            plt.plot(X_sorted[:, i], y_sorted)
+            plt.show()
 
-    # =====================================================================
+        # =====================================================================
 
-    from scipy.optimize import minimize
+        from scipy.optimize import minimize
 
-    methods = "Nelder-Mead,L-BFGS-B,TNC,SLSQP,Powell,trust-constr".split(",")
+        methods = "Nelder-Mead,L-BFGS-B,TNC,SLSQP,Powell,trust-constr".split(",")
 
-    x0 = np.ones(X.shape[1]) * 100
+        x0 = np.ones(X.shape[1]) * 100
 
-    for method in methods:
-        print("==============================================")
-        print(f"================= {method} =====================")
-        print("==============================================")
+        for method in methods:
+            print("==============================================")
+            print(f"================= {method} =====================")
+            print("==============================================")
 
-        scores = []
+            scores = []
 
-        def func(x):
-            global scores
-            lam = list(x)
+            def func(x):
+                global scores
+                lam = list(x)
 
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=1)
-            gam = LinearGAM(lam=lam).fit(X_train, y_train)
-            score = np.mean((y_test - gam.predict(X_test)) ** 2)
+                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=1)
+                gam = LinearGAM(lam=lam).fit(X_train, y_train)
+                score = np.mean((y_test - gam.predict(X_test)) ** 2)
 
-            scores.append(score)
+                scores.append(score)
 
-            return score
+                return score
 
-        minimize(
-            func,
-            x0=x0,
-            method=method,
-            bounds=[(0, np.inf) for _ in range(len(x0))],
-        )
+            minimize(
+                func,
+                x0=x0,
+                method=method,
+                bounds=[(0, np.inf) for _ in range(len(x0))],
+            )
 
-        plt.title(method)
-        plt.plot(scores)
-        plt.grid(True)
-        plt.show()
+            plt.title(method)
+            plt.plot(scores)
+            plt.grid(True)
+            plt.show()
 
-        import time
+            import time
 
-        time.sleep(3)
+            time.sleep(3)

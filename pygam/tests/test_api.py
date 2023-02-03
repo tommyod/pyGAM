@@ -8,7 +8,6 @@ from pygam import LinearGAM, l, s
 
 class TestInvariancesToAdditionAndMultiPlication:
     def test_that_cyclic_spline_can_match_sine_wave(self):
-
         X = np.linspace(0, 1, 1000, endpoint=False).reshape(-1, 1)
         y = np.sin(X.ravel() * 2 * np.pi)
 
@@ -47,7 +46,6 @@ class TestInvariancesToAdditionAndMultiPlication:
 
     @pytest.mark.parametrize("factor", [1, 2, 5])
     def test_that_cyclic_spline_X_is_invariant_to_multiplication(self, factor):
-
         X = np.linspace(0, 1, 1000, endpoint=False).reshape(-1, 1) * factor
         y = np.sin(X.ravel() * 2 * np.pi) * factor
 
@@ -70,7 +68,6 @@ class TestInvariancesToAdditionAndMultiPlication:
                 assert np.isclose(np.sum(coefs), 0)
 
     def test_that_linear_term_penalties_work_as_expected(self):
-
         # Create a problem
         generator = np.random.default_rng(23)
         X = generator.normal(size=(10_000, 2))
@@ -98,7 +95,6 @@ class TestInvariancesToAdditionAndMultiPlication:
         assert np.allclose(gam.coef_, np.array([0.999936, 1.999744, 99.999993]))
 
     def test_that_spline_reduces_to_linear_function_with_strong_penalty(self):
-
         X = np.linspace(0, 1, 10000, endpoint=False).reshape(-1, 1) + 0
         y = 5 * X.ravel() + np.sin(X.ravel() * np.pi)
 
