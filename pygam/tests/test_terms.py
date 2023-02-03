@@ -139,6 +139,23 @@ def test_term_list_only_accepts_terms_or_term_list():
         TermList(None)
 
 
+def test_that_all_terms_return_array_for_constraints_and_penalties():
+
+    term = SplineTerm(0, n_splines=8)
+    penalty = term.build_penalties()
+    assert isinstance(penalty, np.ndarray)
+    assert penalty.shape[1] == 8
+
+    constraint = term.build_constraints(np.arange(8), 1)
+    assert isinstance(constraint, np.ndarray)
+    assert constraint.shape[1] == 8
+
+    term = LinearTerm(0)
+    penalty = term.build_penalties()
+    assert isinstance(penalty, np.ndarray)
+    assert penalty.shape[1] == 1
+
+
 def test_pop_term_from_term_list():
     term_list = SplineTerm(0) + LinearTerm(1) + Intercept()
     term_list_2 = deepcopy(term_list)
@@ -340,8 +357,8 @@ class TestTensorTerm:
         tensor2 = te(s(0, n_splines=splines1), s(1, n_splines=splines2))
         assert tensor2.n_coefs == splines1 * splines2
 
-        penalties1 = tensor1.build_penalties().A
-        penalties2 = tensor2.build_penalties().A
+        penalties1 = tensor1.build_penalties()
+        penalties2 = tensor2.build_penalties()
         expected_shape = (splines1 * splines2, splines1 * splines2)
         assert penalties1.shape == expected_shape
         assert penalties2.shape == expected_shape
@@ -360,8 +377,8 @@ class TestTensorTerm:
         tensor2 = te(*te_args)
         assert tensor2.n_coefs == np.prod(n_splines)
 
-        penalties1 = tensor1.build_penalties().A
-        penalties2 = tensor2.build_penalties().A
+        penalties1 = tensor1.build_penalties()
+        penalties2 = tensor2.build_penalties()
         expected_shape = tuple([np.prod(n_splines)] * 2)
         assert penalties1.shape == expected_shape
         assert penalties2.shape == expected_shape

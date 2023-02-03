@@ -1367,7 +1367,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
 
         >>> spline1 = s(0, n_splines=3, lam=1)
         >>> spline2 = s(1, n_splines=4, lam=1)
-        >>> te(spline1, spline2).build_penalties().A.astype(int)
+        >>> te(spline1, spline2).build_penalties().astype(int)
         array([[ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
                [ 1, -2,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0],
                [ 0,  1, -2,  1,  0,  0,  0,  0,  0,  0,  0,  0],
@@ -1381,23 +1381,54 @@ class TensorTerm(SplineTerm, MetaTermMixin):
                [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -2,  1],
                [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]])
         """
-        P = sp.sparse.csc_matrix((self.n_coefs, self.n_coefs))
 
-        for i, _ in enumerate(self._terms):
-            P += self._build_marginal_penalties(i)
+        marginal_penalty_matrices = [self._build_marginal_penalties(i) for i, _ in enumerate(self._terms)]
 
-        return sp.sparse.csc_matrix(P)
+        return functools.reduce(np.add, marginal_penalty_matrices)
 
     def _build_marginal_penalties(self, i):
+        """
+
+        Examples
+        --------
+        >>> spline1 = s(0, n_splines=3, lam=1)
+        >>> spline2 = s(1, n_splines=4, lam=1)
+        >>> te(spline1, spline2)._build_marginal_penalties(0).astype(int)
+        array([[ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 1,  0,  0,  0, -2,  0,  0,  0,  1,  0,  0,  0],
+               [ 0,  1,  0,  0,  0, -2,  0,  0,  0,  1,  0,  0],
+               [ 0,  0,  1,  0,  0,  0, -2,  0,  0,  0,  1,  0],
+               [ 0,  0,  0,  1,  0,  0,  0, -2,  0,  0,  0,  1],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]])
+        >>> te(spline1, spline2)._build_marginal_penalties(1).astype(int)
+        array([[ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 1, -2,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  1, -2,  1,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  1, -2,  1,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  1, -2,  1,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  1, -2,  1,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -2,  1],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]])
+        """
 
         # i = 0 -> sp.sparse.kron(term.build_penalties(), sparse.eye, sparse.eye)
         # i = 1 -> sp.sparse.kron(sparse.eye, term.build_penalties(), sparse.eye)
         # i = 1 -> sp.sparse.kron(sparse.eye, sparse.eye, term.build_penalties())
 
         penalty_matrices = [
-            (term.build_penalties() if i == j else sp.sparse.eye(term.n_coefs)) for j, term in enumerate(self._terms)
+            (term.build_penalties() if i == j else np.eye(term.n_coefs)) for j, term in enumerate(self._terms)
         ]
-        return functools.reduce(sp.sparse.kron, penalty_matrices)
+        return functools.reduce(sp.linalg.kron, penalty_matrices)
 
     def build_constraints(self, coef, constraint_lam):
         """
@@ -1416,12 +1447,33 @@ class TensorTerm(SplineTerm, MetaTermMixin):
         Returns
         -------
         C : sparse CSC matrix containing the model constraints in quadratic form
-        """
-        C = sp.sparse.csc_matrix((self.n_coefs, self.n_coefs))
-        for i, _ in enumerate(self._terms):
-            C += self._build_marginal_constraints(i, coef, constraint_lam)
 
-        return sp.sparse.csc_matrix(C)
+        Examples
+        --------
+        >>> spline1 = s(0, n_splines=3, lam=1)
+        >>> spline2 = s(1, n_splines=4, lam=1, constraints="monotonic_inc")
+        >>> coef = np.array([0, 1, 2, 3, 4, 5, 6, 0, 8, 9, 10, 11])
+        >>> tensor = te(spline1, spline2)
+        >>> tensor.build_constraints(-coef, 1).astype(int)
+        array([[ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0, -1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0, -1,  1,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0, -1,  1,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0, -1,  1,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0, -1,  1,  0,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0, -1,  1,  0],
+               [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1,  1]])
+
+        """
+        marginal_constraints = [
+            self._build_marginal_constraints(i, coef, constraint_lam) for i, _ in enumerate(self._terms)
+        ]
+
+        return functools.reduce(np.add, marginal_constraints)
 
     def _build_marginal_constraints(self, i, coef, constraint_lam):
         """builds a constraint matrix for a marginal term in the tensor term
@@ -1457,7 +1509,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
                [-1,  1,  0,  0],
                [ 0, -1,  1,  0],
                [ 0,  0,  0,  0]])
-        >>> tensor._build_marginal_constraints(1, -coef, 1).A.astype(int)
+        >>> tensor._build_marginal_constraints(1, -coef, 1).astype(int)
         array([[ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
                [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
                [ 0, -1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0],
@@ -1472,7 +1524,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
                [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1,  1]])
         """
 
-        composite_C = sp.sparse.csc_matrix((len(coef), len(coef)))
+        composite_C = np.zeros((len(coef), len(coef)))
 
         for slice_ in self._iterate_marginal_coef_slices(i):
             # get the slice of coefficient vector
@@ -1484,7 +1536,7 @@ class TensorTerm(SplineTerm, MetaTermMixin):
             # now enter it into the composite
             composite_C[tuple(np.meshgrid(slice_, slice_))] = slice_C.T
 
-        return sp.sparse.csc_matrix(composite_C)
+        return composite_C
 
     def _iterate_marginal_coef_slices(self, i):
         """iterator of indices into tensor's coef vector for marginal term i's coefs
@@ -1930,6 +1982,16 @@ TERMS = {
 
 
 if __name__ == "__main__":
+    import pytest
+
+    pytest.main(
+        args=[
+            __file__,
+            "-v",
+            "--capture=sys",
+            "--doctest-modules",
+        ]
+    )
 
     spline = s(0, n_splines=3, lam=1)
     spline2 = s(0, n_splines=4, lam=1)
