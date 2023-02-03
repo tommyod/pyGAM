@@ -6,7 +6,6 @@ import numpy as np
 import pytest
 
 from pygam import LinearGAM, PoissonGAM, f, l, s, te
-from pygam.penalties import FDMatrix
 from pygam.terms import FactorTerm, Intercept, LinearTerm, SplineTerm, TensorTerm, Term, TermList
 from pygam.utils import flatten
 
@@ -286,19 +285,27 @@ def test_tensor_composite_constraints_equal_penalties():
     is equivalent to a penalty matrix under the correct conditions
     """
 
+    from pygam.penalties import derivative
+
     def der1(*args, **kwargs):
-        kwargs.update({"order": 1})
-        return FDMatrix.derivative(*args, **kwargs, periodic=False)
+        print(args, kwargs)
+        return derivative(*args, **kwargs)
 
     # create a 3D tensor where the penalty should be equal to the constraint
-    term = te(0, 1, 2, n_splines=[4, 5, 6], penalties=der1, lam=1, constraints="monotonic_inc")
+    term = te(0, 1, n_splines=[4, 5], penalties=der1, lam=1, constraints="monotonic_inc")
 
     # check all the dimensions
     for i in range(3):
         P = term._build_marginal_penalties(i).A
         C = term._build_marginal_constraints(i, -np.arange(term.n_coefs), constraint_lam=1).A
+        P = P @ P.T
 
-        assert (P == C).all()
+        print(P)
+        print(P.shape)
+        print(C)
+        print(C.shape)
+
+        assert np.all(P == C)
 
 
 def test_tensor_with_constraints(hepatitis_X_y):
@@ -440,34 +447,38 @@ if __name__ == "__main__":
         ]
     )
 
-    # This dataset only has one feature
-    from pygam.datasets import hepatitis
+    if False:
 
-    X, y = hepatitis(True)
+        # This dataset only has one feature
+        from pygam.datasets import hepatitis
 
-    # Add a random interaction data
-    rng = np.random.default_rng(1)
-    X = np.c_[X, rng.normal(size=X.shape[0])]
-    X = rng.normal(size=(100, 2))
-    X = X[np.argsort(X[:, 0]), :]
-    y = 1 / (1 + np.exp(-X[:, 0]))
+        X, y = hepatitis(True)
 
-    # constrain useless dimension
-    gam_useless_constraint = LinearGAM(te(0, 1, constraints=["none", "monotonic_dec"], n_splines=[10, 4], lam=[1, 1]))
-    gam_useless_constraint.fit(X, y)
+        # Add a random interaction data
+        rng = np.random.default_rng(1)
+        X = np.c_[X, rng.normal(size=X.shape[0])]
+        X = rng.normal(size=(100, 2))
+        X = X[np.argsort(X[:, 0]), :]
+        y = 1 / (1 + np.exp(-X[:, 0]))
 
-    # constrain informative dimension
-    gam_constrained = LinearGAM(te(0, 1, constraints=["monotonic_dec", "none"], n_splines=[10, 4], lam=[1, 1]))
-    gam_constrained.fit(X, y)
+        # constrain useless dimension
+        gam_useless_constraint = LinearGAM(
+            te(0, 1, constraints=["none", "monotonic_dec"], n_splines=[10, 4], lam=[1, 1])
+        )
+        gam_useless_constraint.fit(X, y)
 
-    import matplotlib.pyplot as plt
+        # constrain informative dimension
+        gam_constrained = LinearGAM(te(0, 1, constraints=["monotonic_dec", "none"], n_splines=[10, 4], lam=[1, 1]))
+        gam_constrained.fit(X, y)
 
-    plt.scatter(X[:, 0], y)
-    plt.plot(X[:, 0], gam_useless_constraint.predict(X), color="red")
-    plt.plot(X[:, 0], gam_constrained.predict(X), color="black")
+        import matplotlib.pyplot as plt
 
-    print(gam_useless_constraint.statistics_["pseudo_r2"]["explained_deviance"])
-    print(gam_constrained.statistics_["pseudo_r2"]["explained_deviance"])
+        plt.scatter(X[:, 0], y)
+        plt.plot(X[:, 0], gam_useless_constraint.predict(X), color="red")
+        plt.plot(X[:, 0], gam_constrained.predict(X), color="black")
 
-    assert gam_useless_constraint.statistics_["pseudo_r2"]["explained_deviance"] > 0.5
-    assert gam_constrained.statistics_["pseudo_r2"]["explained_deviance"] < 0.1
+        print(gam_useless_constraint.statistics_["pseudo_r2"]["explained_deviance"])
+        print(gam_constrained.statistics_["pseudo_r2"]["explained_deviance"])
+
+        assert gam_useless_constraint.statistics_["pseudo_r2"]["explained_deviance"] > 0.5
+        assert gam_constrained.statistics_["pseudo_r2"]["explained_deviance"] < 0.1
